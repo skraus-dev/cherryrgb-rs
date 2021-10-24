@@ -1,5 +1,5 @@
 use anyhow::{anyhow, Context, Result};
-use cherryrgb::{self, Brightness, LightingMode, Speed, RGB8};
+use cherryrgb::{self, Brightness, Command, LightingMode, Speed, RGB8};
 use std::convert::TryFrom;
 use structopt::StructOpt;
 
@@ -66,14 +66,19 @@ fn main() -> Result<()> {
         mode, brightness, speed, opt.color
     );
 
-    let packet_bytes = cherryrgb::led_packet(mode, brightness, Some(speed), opt.color, opt.rainbow);
+    let payload = cherryrgb::led_payload(mode, brightness, Some(speed), opt.color, opt.rainbow);
 
     println!("Setting mode...");
-    cherryrgb::send_payload(&device_handle, &packet_bytes)?;
+    cherryrgb::send_payload(&device_handle, true, Command::SetAnimation, &payload)?;
 
     // Unknown data
     println!("Setting unknown packet...");
-    cherryrgb::send_payload(&device_handle, &[0x00, 0x06, 0x01, 0x18, 0x00, 0x55, 0x01])?;
+    cherryrgb::send_payload(
+        &device_handle,
+        false,
+        Command::SetAnimation,
+        &[0x01, 0x18, 0x00, 0x55, 0x01],
+    )?;
 
     cherryrgb::end_transaction(&device_handle)?;
 

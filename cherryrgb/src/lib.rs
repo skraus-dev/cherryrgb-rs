@@ -16,6 +16,18 @@ const USB_PID: u16 = 0x00dd;
 const INTERFACE_NUM: u8 = 1;
 static TIMEOUT: Duration = Duration::from_millis(1000);
 
+// Commands
+#[derive(TryFromPrimitive, IntoPrimitive, Eq, PartialEq, Debug)]
+#[repr(u8)]
+pub enum Command {
+    TransactionStart = 0x01,
+    TransactionEnd = 0x02,
+    Unknown3 = 0x03,
+    SetAnimation = 0x06,
+    Unknown7 = 0x07,
+    Unknown1B = 0x1B,
+}
+
 /// Modes support:
 /// -> C: Color
 /// -> S: Speed
@@ -74,61 +86,66 @@ pub enum Brightness {
     Full = 4,
 }
 
-/// Assemble LED setting packet
-///
-/// Example:
-/// magic                      brightness  rainbow
-///  |                             |         |   COLOR
-///  | check                   mode|speed    |  R  G  B
-///  |  |                       |  |  |      |  |  |  |
-///  v  v                       v  v  v      v  v  v  v
-/// "04 EE 01 06 09 00 00 55 00 12 03 03 00 00 7E 00 F4"
-pub fn led_packet(
+/// Assemble LED setting payload
+///               brightness  rainbow
+///                    |         |   COLOR
+///                mode|speed    |  R  G  B
+///                 |  |  |      |  |  |  |
+///                 v  v  v      v  v  v  v
+/// "09 00 00 55 00 12 03 03 00 00 7E 00 F4"
+pub fn led_payload(
     mode: LightingMode,
     brightness: Brightness,
     speed: Option<Speed>,
     color: Option<RGB8>,
     rainbow: bool,
 ) -> Vec<u8> {
-    let mut packet = vec![0x01, 0x06, 0x09, 0x00, 0x00, 0x55, 0x00];
+    let mut payload = vec![0x09, 0x00, 0x00, 0x55, 0x00];
 
-    packet.push(mode.into());
-    packet.push(brightness.into());
-    packet.push(speed.or(Some(Speed::Slow)).unwrap().into());
-    packet.push(0);
-    packet.push(rainbow.into());
+    payload.push(mode.into());
+    payload.push(brightness.into());
+    payload.push(speed.or(Some(Speed::Slow)).unwrap().into());
+    payload.push(0);
+    payload.push(rainbow.into());
     if let Some(c) = color {
-        packet.extend(c.as_slice());
+        payload.extend(c.as_slice());
     }
 
-    packet
+    payload
 }
 
 /// Calculate packet checksum (index 1 in payload)
 fn calc_checksum(data: &[u8]) -> u8 {
-    let test = data.iter().map(|&i| i as u32).sum::<u32>();
+    let sum = data.iter().map(|&i| i as u32).sum::<u32>();
 
-    (test & 0xFF) as u8
+    (sum & 0xFF) as u8
 }
 
-// Prepend magic + checksum to payload
-fn prepare_packet(payload: &[u8]) -> Vec<u8> {
-    // Skip first byte of payload
-    // In reference to total packet this means: skip first 3 bytes
-    let checksum_val = calc_checksum(&payload[1..]);
+// Prepend magic, checksum, unknown and command to payload
+fn prepare_packet(unknown: bool, command: Command, payload: &[u8]) -> Vec<u8> {
     let mut packet = vec![
-        0x04,         // Magic
-        checksum_val, // Checksum
+        0x04,           // Magic
+        0x00,           // Checksum (fill in next step)
+        unknown.into(), // Unknown flag
+        command.into(), // Command
     ];
+    // Append payload
     packet.extend(payload);
+    // Set checksum
+    packet[1] = calc_checksum(&packet[3..]);
 
     packet
 }
 
 /// Writes a control packet first, then reads interrupt packet
-pub fn send_payload(device: &rusb::DeviceHandle<rusb::Context>, payload: &[u8]) -> Result<Vec<u8>> {
+pub fn send_payload(
+    device: &rusb::DeviceHandle<rusb::Context>,
+    unknown: bool,
+    command: Command,
+    payload: &[u8],
+) -> Result<Vec<u8>> {
     // Prepend magic + checksum
-    let packet = prepare_packet(payload);
+    let packet = prepare_packet(unknown, command, payload);
 
     let mut response = [0u8; 64];
     device
@@ -155,31 +172,31 @@ pub fn send_payload(device: &rusb::DeviceHandle<rusb::Context>, payload: &[u8]) 
 
 /// Start RGB setting transaction
 pub fn start_transaction(device: &rusb::DeviceHandle<rusb::Context>) -> Result<()> {
-    send_payload(device, &[0x00, 0x01])?;
+    send_payload(device, false, Command::TransactionStart, &[])?;
 
     Ok(())
 }
 
 /// End RGB setting transaction
 pub fn end_transaction(device: &rusb::DeviceHandle<rusb::Context>) -> Result<()> {
-    send_payload(device, &[0x00, 0x02])?;
+    send_payload(device, false, Command::TransactionEnd, &[])?;
 
     Ok(())
 }
 
 /// Just taken 1:1 from usb capture
 pub fn fetch_device_state(device: &rusb::DeviceHandle<rusb::Context>) -> Result<()> {
-    send_payload(device, &[0x00, 0x03, 0x22])?;
-    send_payload(device, &[0x00, 0x07, 0x38, 0x00])?;
-    send_payload(device, &[0x00, 0x07, 0x38, 0x38])?;
-    send_payload(device, &[0x00, 0x07, 0x38, 0x70])?;
-    send_payload(device, &[0x00, 0x07, 0x38, 0xA8])?;
-    send_payload(device, &[0x01, 0x07, 0x38, 0xE0])?;
-    send_payload(device, &[0x00, 0x07, 0x38, 0x18, 0x01])?;
-    send_payload(device, &[0x00, 0x07, 0x2A, 0x50, 0x01])?;
-    send_payload(device, &[0x00, 0x1B, 0x38, 0x00])?;
-    send_payload(device, &[0x00, 0x1B, 0x38, 0x38])?;
-    send_payload(device, &[0x00, 0x1B, 0x0E, 0x70])?;
+    send_payload(device, false, Command::Unknown3, &[0x22])?;
+    send_payload(device, false, Command::Unknown7, &[0x38, 0x00])?;
+    send_payload(device, false, Command::Unknown7, &[0x38, 0x38])?;
+    send_payload(device, false, Command::Unknown7, &[0x38, 0x70])?;
+    send_payload(device, false, Command::Unknown7, &[0x38, 0xA8])?;
+    send_payload(device, true, Command::Unknown7, &[0x38, 0xE0])?;
+    send_payload(device, false, Command::Unknown7, &[0x38, 0x18, 0x01])?;
+    send_payload(device, false, Command::Unknown7, &[0x2A, 0x50, 0x01])?;
+    send_payload(device, false, Command::Unknown1B, &[0x38, 0x00])?;
+    send_payload(device, false, Command::Unknown1B, &[0x38, 0x38])?;
+    send_payload(device, false, Command::Unknown1B, &[0x0E, 0x70])?;
 
     Ok(())
 }
@@ -259,11 +276,9 @@ mod tests {
             "04 DC 01 06 09 00 00 55 00 03 03 00 00 00 7E 00 F4", // 17 - Static - Purple
             "04 4D 01 06 09 00 00 55 00 03 03 00 00 00 E0 03 00", // 18 - Static - Red
             "04 52 01 06 09 00 00 55 00 08 03 00 00 00 E0 03 00", // 19 - Custom
-
             // start / end transaction packets
             "04 01 00 01",
             "04 02 00 02",
-
             // fetch device info packets
             "04 25 00 03 22 00 00",
             "04 3f 00 07 38 00 00",
@@ -276,7 +291,6 @@ mod tests {
             "04 53 00 1b 38 00 00",
             "04 8b 00 1b 38 38 00",
             "04 99 00 1b 0e 70 00",
-
             // Unknown
             "04 43 00 0b 38 00 00",
             "04 7b 00 0b 38 38 00",
