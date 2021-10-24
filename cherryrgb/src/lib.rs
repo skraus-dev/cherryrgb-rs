@@ -14,6 +14,7 @@ pub use rgb::{ComponentSlice, RGB8};
 const USB_VID: u16 = 0x046a;
 const USB_PID: u16 = 0x00dd;
 const INTERFACE_NUM: u8 = 1;
+const INTERRUPT_EP: u8 = 0x82;
 static TIMEOUT: Duration = Duration::from_millis(1000);
 
 // Commands
@@ -150,9 +151,13 @@ pub fn send_payload(
     let mut response = [0u8; 64];
     device
         .write_control(
-            0x21,    // RequestType
-            0x09,    // Request
-            0x0204,  // Value
+            rusb::request_type(
+                rusb::Direction::Out,
+                rusb::RequestType::Class,
+                rusb::Recipient::Interface,
+            ),
+            0x09,    // Request - SET_REPORT
+            0x0204,  // Value - ReportId: 4, ReportType: Output
             0x0001,  // Index
             &packet, // Data
             TIMEOUT,
@@ -161,7 +166,7 @@ pub fn send_payload(
 
     device
         .read_interrupt(
-            0x82,          // Endpoint
+            INTERRUPT_EP,  // Endpoint
             &mut response, // read buffer
             TIMEOUT,
         )
