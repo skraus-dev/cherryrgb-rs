@@ -108,12 +108,14 @@ pub fn led_packet(
 fn calc_checksum(data: &[u8]) -> u8 {
     let test = data.iter().map(|&i| i as u32).sum::<u32>();
 
-    ((test & 0xFF) - 1) as u8
+    (test & 0xFF) as u8
 }
 
 // Prepend magic + checksum to payload
 fn prepare_packet(payload: &[u8]) -> Vec<u8> {
-    let checksum_val = calc_checksum(payload);
+    // Skip first byte of payload
+    // In reference to total packet this means: skip first 3 bytes
+    let checksum_val = calc_checksum(&payload[1..]);
     let mut packet = vec![
         0x04,         // Magic
         checksum_val, // Checksum
@@ -257,22 +259,48 @@ mod tests {
             "04 DC 01 06 09 00 00 55 00 03 03 00 00 00 7E 00 F4", // 17 - Static - Purple
             "04 4D 01 06 09 00 00 55 00 03 03 00 00 00 E0 03 00", // 18 - Static - Red
             "04 52 01 06 09 00 00 55 00 08 03 00 00 00 E0 03 00", // 19 - Custom
+
+            // start / end transaction packets
+            "04 01 00 01",
+            "04 02 00 02",
+
+            // fetch device info packets
+            "04 25 00 03 22 00 00",
+            "04 3f 00 07 38 00 00",
+            "04 77 00 07 38 38 00",
+            "04 af 00 07 38 70 00",
+            "04 e7 00 07 38 a8 00",
+            "04 1f 01 07 38 e0 00",
+            "04 58 00 07 38 18 01",
+            "04 82 00 07 2a 50 01",
+            "04 53 00 1b 38 00 00",
+            "04 8b 00 1b 38 38 00",
+            "04 99 00 1b 0e 70 00",
+
+            // Unknown
+            "04 43 00 0b 38 00 00",
+            "04 7b 00 0b 38 38 00",
+            "04 b3 00 0b 38 70 00",
+            "04 eb 00 0b 38 a8 00",
+            "04 23 01 0b 38 e0 00",
+            "04 5c 00 0b 38 18 01",
+            "04 86 00 0b 2a 50 01",
         ]
     }
 
     #[test]
     fn test_checksum() {
-        for pkt_str in packets() {
+        for (index, &pkt_str) in packets().iter().enumerate() {
             let pkt =
                 hex::decode(pkt_str.replace(" ", "")).expect("Failed to convert pkt hexstream");
 
             let expected_checksum = pkt[1];
-            let calcd_checksum = calc_checksum(&pkt[2..]);
+            let calcd_checksum = calc_checksum(&pkt[3..]);
 
             assert_eq!(
                 expected_checksum, calcd_checksum,
-                "Failed checksum for pkt: {:?}",
-                pkt_str
+                "Failed checksum for pkt {} data={:?}",
+                index, pkt_str
             );
         }
     }
