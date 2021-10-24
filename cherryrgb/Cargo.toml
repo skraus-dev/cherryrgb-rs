@@ -2,6 +2,10 @@
 name = "cherryrgb"
 version = "0.0.1"
 edition = "2018"
+description = "Cherry RGB keyboard instrumentation"
+repository = "https://github.com/skraus-dev/cherryrgb-rs"
+license = "MIT"
+homepage = "https://github.com/skraus-dev/cherryrgb-rs"
 
 [dependencies]
 anyhow = "1.0.44"

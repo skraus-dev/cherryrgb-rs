@@ -1,5 +1,8 @@
 # Cherry RGB Keyboard util
 
+[![GitHub release](https://img.shields.io/github/v/release/skraus-dev/cherryrgb-rs?include_prereleases)](https://github.com/skraus-dev/cherryrgb-rs/releases/latest)
+[![CI](https://github.com/skraus-dev/cherryrgb-rs/workflows/CI/badge.svg)](https://github.com/skraus-dev/cherryrgb-rs/actions)
+
 Tested with
 * Cherry Keyboard G80-3000N RGB
 
