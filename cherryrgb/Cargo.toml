@@ -1,0 +1,11 @@
+[package]
+name = "cherryrgb"
+version = "0.0.1"
+edition = "2018"
+
+[dependencies]
+anyhow = "1.0.44"
+hex = "0.4.3"
+num_enum = "0.5.4"
+rgb = "0.8.27"
+rusb = "0.9.0"

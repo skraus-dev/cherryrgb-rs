@@ -1,0 +1,11 @@
+[package]
+name = "cherryrgb_cli"
+version = "0.1.0"
+edition = "2018"
+
+[workspace]
+
+[dependencies]
+cherryrgb = { path = "cherryrgb" }
+anyhow = "1.0.44"
+structopt = "0.3.25"
