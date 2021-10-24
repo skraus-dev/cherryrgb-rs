@@ -39,10 +39,10 @@ pub enum LightingMode {
     Spectrum = 0x01,  // S
     Breathing = 0x02, // CS
     Static = 0x03,    // n/A
-    Heartbeat = 0x04, // Unofficial
+    Radar = 0x04,     // Unofficial
     Vortex = 0x05,    // Unofficial
     Fire = 0x06,      // Unofficial
-    Colors = 0x07,    // Unofficial
+    Stars = 0x07,     // Unofficial
     Rain = 0x0B,      // Unofficial (looks like Matrix :D)
     Custom = 0x08,
     Rolling = 0x0A,   // S
