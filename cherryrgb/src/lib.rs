@@ -134,6 +134,8 @@ fn prepare_packet(unknown: bool, command: Command, payload: &[u8]) -> Vec<u8> {
     packet.extend(payload);
     // Set checksum
     packet[1] = calc_checksum(&packet[3..]);
+    // Pad to 64 bytes
+    packet.resize(64, 0);
 
     packet
 }
