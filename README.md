@@ -1,60 +1,78 @@
-# Cherry RGB Keyboard util
+# Cherry RGB Keyboard Library
 
+[![Crates.io](https://img.shields.io/crates/v/cherryrgb.svg)](https://crates.io/crates/cherryrgb)
+[![Docs.rs](https://docs.rs/cherryrgb/badge.svg)](https://docs.rs/cherryrgb)
 [![GitHub release](https://img.shields.io/github/v/release/skraus-dev/cherryrgb-rs?include_prereleases)](https://github.com/skraus-dev/cherryrgb-rs/releases/latest)
 [![CI](https://github.com/skraus-dev/cherryrgb-rs/workflows/CI/badge.svg)](https://github.com/skraus-dev/cherryrgb-rs/actions)
 
 Tested with
-* Cherry Keyboard G80-3000N RGB
+* Cherry Keyboard G80-3000N RGB (046a:00dd)
 
-```
-Bus 001 Device 021: ID 046a:00dd Cherry GmbH CHERRY Keyboard
-```
+## Library
 
-## What does it do?
+Find usb keyboard and initialize it
 
-Sets LED modes of keyboard.
-WIP.
-
-## How to use (Development)
-
-Requirements:
-
-* cargo
-
-```
-$ cargo run -- --help
-
-cherryrgb 0.1.0
-Test tool for Cherry RGB Keyboard
-
-USAGE:
-    cherryrgb_cli [FLAGS] [OPTIONS] <mode> <speed> <brightness>
-
-FLAGS:
-    -h, --help       Prints help information
-    -r, --rainbow    Enable rainbow colors
-    -V, --version    Prints version information
-
-OPTIONS:
-    -c, --color <color>    Color (e.g 255,255,255)
-
-ARGS:
-    <mode>          Set LED mode (range 0-15)
-    <speed>         Set speed (range 0-4)
-    <brightness>    Set brightness (range 0-4)
+```rs
+let mut device_handle = cherryrgb::find_device().unwrap();
+cherryrgb::init_device(&mut device_handle).unwrap();
+cherryrgb::fetch_device_state(&device_handle).unwrap();
 ```
 
-Example
+Set LED animation
 
-* Sets color to green
-* Mode: Heartbeat
-* Speed: 0 (Fast)
-* Brightness: Full
+```rs
+// Create color: green
+let color = cherryrgb::RGB8::new(0, 0xff, 0);
+let use_rainbow_colors: bool = false;
+
+cherryrgb::set_led_animation(
+    &device_handle,
+    cherryrgb::LightingMode::Rain,
+    cherryrgb::Brightness::Full,
+    cherryrgb::Speed::Slow,
+    color,
+    use_rainbow_colors,
+)
+.unwrap();
+```
+
+Set custom colors
+```rs
+// Reset all colors first
+cherryrgb::reset_custom_colors(&device_handle).unwrap();
+
+// Create color: green
+let color = cherryrgb::RGB8::new(0, 0xff, 0);
+
+// Create keys struct and set key with index 42 to desired color
+let mut keys = cherryrgb::CustomKeyLeds::new();
+keys.set_led(42, color.into()).unwrap();
+
+// Send packets to keyboard
+cherryrgb::set_custom_colors(&device_handle, keys).unwrap();
+```
+
+## CLI
+
+Set LED animation
+
+* Color: #00ff00 (green)
+* Mode: Rain
+* Speed: slow
+* Brightness: medium
 
 ```
-cargo run -- --color 0,255,0 4 0 4
-# Or, when using the binary standalone
-./cherryrgb_cli --color 0,255,0 4 0 4
+./cherryrgb_cli -b medium animation rain slow 00ff00
+```
+
+Set custom key colors
+
+* Brightness: full
+* Key 0 color: #ff00ff
+* Key 1 color: #0000ff
+
+```
+./cherryrgb_cli -b full custom-colors ff00ff 0000ff
 ```
 
 ## Disclaimer

@@ -1,152 +1,56 @@
+mod extensions;
 /// CHERRY G80-3000N RGB TKL experiments
 /// No warranty or liability for possible damages
 /// Use at your own risk!
-use std::time::Duration;
+mod models;
 
 use anyhow::{Context, Result};
-use num_enum::{IntoPrimitive, TryFromPrimitive};
-use rusb::{self, UsbContext};
+use std::time::Duration;
 
 // Re-exports
-pub use rgb::{ComponentSlice, RGB8};
+pub use extensions::{OwnRGB8, ToVec};
+pub use hex;
+pub use models::{
+    Brightness, Command, CustomKeyLeds, LedAnimationPayload, LightingMode, Packet, Speed,
+    UnknownByte,
+};
+pub use rgb::{ComponentSlice, RGB, RGB8};
+pub use rusb::{self, UsbContext};
 
 // Constants
-const USB_VID: u16 = 0x046a;
-const USB_PID: u16 = 0x00dd;
+const CHERRY_USB_VID: u16 = 0x046a;
+const G30_3000N_RGB_TKL_USB_PID: u16 = 0x00dd;
 const INTERFACE_NUM: u8 = 1;
 const INTERRUPT_EP: u8 = 0x82;
 static TIMEOUT: Duration = Duration::from_millis(1000);
 
-// Commands
-#[derive(TryFromPrimitive, IntoPrimitive, Eq, PartialEq, Debug)]
-#[repr(u8)]
-pub enum Command {
-    TransactionStart = 0x01,
-    TransactionEnd = 0x02,
-    Unknown3 = 0x03,
-    SetAnimation = 0x06,
-    Unknown7 = 0x07,
-    Unknown1B = 0x1B,
-}
-
-/// Modes support:
-/// -> C: Color
-/// -> S: Speed
-#[derive(TryFromPrimitive, IntoPrimitive, Eq, PartialEq, Debug)]
-#[repr(u8)]
-pub enum LightingMode {
-    Wave = 0x00,      // CS
-    Spectrum = 0x01,  // S
-    Breathing = 0x02, // CS
-    Static = 0x03,    // n/A
-    Radar = 0x04,     // Unofficial
-    Vortex = 0x05,    // Unofficial
-    Fire = 0x06,      // Unofficial
-    Stars = 0x07,     // Unofficial
-    Rain = 0x0B,      // Unofficial (looks like Matrix :D)
-    Custom = 0x08,
-    Rolling = 0x0A,   // S
-    Curve = 0x0C,     // CS
-    WaveMid = 0x0E,   // Unoffical
-    Scan = 0x0F,      // C
-    Radiation = 0x12, // CS
-    Ripples = 0x13,   // CS
-    SingleKey = 0x15, // CS
-}
-
-/// Probably controlled at OS / driver level
-/// Just defined here for completeness' sake
-#[derive(TryFromPrimitive, IntoPrimitive, Eq, PartialEq, Debug)]
-#[repr(u8)]
-pub enum UsbPollingRate {
-    Low,    // 125Hz
-    Medium, // 250 Hz
-    High,   // 500 Hz
-    Full,   // 1000 Hz
-}
-
-/// LED animation speed
-#[derive(TryFromPrimitive, IntoPrimitive, Eq, PartialEq, Debug)]
-#[repr(u8)]
-pub enum Speed {
-    Fast = 0,
-    Faster = 1,
-    Medium = 2,
-    SlowPlus = 3,
-    Slow = 4,
-}
-
-/// LED brightness
-#[derive(TryFromPrimitive, IntoPrimitive, Eq, PartialEq, Debug)]
-#[repr(u8)]
-pub enum Brightness {
-    Off = 0,
-    Low = 1,
-    Medium = 2,
-    High = 3,
-    Full = 4,
-}
-
-/// Assemble LED setting payload
-///               brightness  rainbow
-///                    |         |   COLOR
-///                mode|speed    |  R  G  B
-///                 |  |  |      |  |  |  |
-///                 v  v  v      v  v  v  v
-/// "09 00 00 55 00 12 03 03 00 00 7E 00 F4"
-pub fn led_payload(
-    mode: LightingMode,
-    brightness: Brightness,
-    speed: Option<Speed>,
-    color: Option<RGB8>,
-    rainbow: bool,
-) -> Vec<u8> {
-    let mut payload = vec![0x09, 0x00, 0x00, 0x55, 0x00];
-
-    payload.push(mode.into());
-    payload.push(brightness.into());
-    payload.push(speed.or(Some(Speed::Slow)).unwrap().into());
-    payload.push(0);
-    payload.push(rainbow.into());
-    if let Some(c) = color {
-        payload.extend(c.as_slice());
-    }
-
-    payload
-}
-
 /// Calculate packet checksum (index 1 in payload)
-fn calc_checksum(data: &[u8]) -> u8 {
-    let sum = data.iter().map(|&i| i as u32).sum::<u32>();
+fn calc_checksum(command: Command, data: &[u8]) -> u8 {
+    let sum = data.iter().map(|&i| i as u32).sum::<u32>() + (command as u32);
 
     (sum & 0xFF) as u8
 }
 
 // Prepend magic, checksum, unknown and command to payload
-fn prepare_packet(unknown: bool, command: Command, payload: &[u8]) -> Vec<u8> {
-    let mut packet = vec![
-        0x04,           // Magic
-        0x00,           // Checksum (fill in next step)
-        unknown.into(), // Unknown flag
-        command.into(), // Command
-    ];
+fn prepare_packet(unknown: UnknownByte, command: Command, payload: &[u8]) -> Result<Vec<u8>> {
+    let mut packet = Packet::new(unknown, command);
     // Append payload
-    packet.extend(payload);
+    packet.set_payload(payload)?;
     // Set checksum
-    packet[1] = calc_checksum(&packet[3..]);
+    packet.update_checksum();
 
-    packet
+    Ok(packet.to_vec())
 }
 
 /// Writes a control packet first, then reads interrupt packet
-pub fn send_payload(
+fn send_payload(
     device: &rusb::DeviceHandle<rusb::Context>,
-    unknown: bool,
+    unknown: UnknownByte,
     command: Command,
     payload: &[u8],
 ) -> Result<Vec<u8>> {
     // Prepend magic + checksum
-    let packet = prepare_packet(unknown, command, payload);
+    let packet = prepare_packet(unknown, command, payload)?;
 
     let mut response = [0u8; 64];
     device
@@ -163,6 +67,7 @@ pub fn send_payload(
             TIMEOUT,
         )
         .context("Control Write failure")?;
+    log::debug!("# >> CONTROL TRANSFER\n{:?}\n", hex::encode(&packet));
 
     device
         .read_interrupt(
@@ -171,49 +76,133 @@ pub fn send_payload(
             TIMEOUT,
         )
         .context("Interrupt read failure")?;
+    log::debug!("# << INTERRUPT TRANSFER\n{:?}\n", hex::encode(&response));
 
     Ok(response.to_vec())
 }
 
 /// Start RGB setting transaction
-pub fn start_transaction(device: &rusb::DeviceHandle<rusb::Context>) -> Result<()> {
-    send_payload(device, false, Command::TransactionStart, &[])?;
+fn start_transaction(device: &rusb::DeviceHandle<rusb::Context>) -> Result<()> {
+    send_payload(device, UnknownByte::Zero, Command::TransactionStart, &[])?;
 
     Ok(())
 }
 
 /// End RGB setting transaction
-pub fn end_transaction(device: &rusb::DeviceHandle<rusb::Context>) -> Result<()> {
-    send_payload(device, false, Command::TransactionEnd, &[])?;
+fn end_transaction(device: &rusb::DeviceHandle<rusb::Context>) -> Result<()> {
+    send_payload(device, UnknownByte::Zero, Command::TransactionEnd, &[])?;
 
     Ok(())
 }
 
 /// Just taken 1:1 from usb capture
 pub fn fetch_device_state(device: &rusb::DeviceHandle<rusb::Context>) -> Result<()> {
-    send_payload(device, false, Command::Unknown3, &[0x22])?;
-    send_payload(device, false, Command::Unknown7, &[0x38, 0x00])?;
-    send_payload(device, false, Command::Unknown7, &[0x38, 0x38])?;
-    send_payload(device, false, Command::Unknown7, &[0x38, 0x70])?;
-    send_payload(device, false, Command::Unknown7, &[0x38, 0xA8])?;
-    send_payload(device, true, Command::Unknown7, &[0x38, 0xE0])?;
-    send_payload(device, false, Command::Unknown7, &[0x38, 0x18, 0x01])?;
-    send_payload(device, false, Command::Unknown7, &[0x2A, 0x50, 0x01])?;
-    send_payload(device, false, Command::Unknown1B, &[0x38, 0x00])?;
-    send_payload(device, false, Command::Unknown1B, &[0x38, 0x38])?;
-    send_payload(device, false, Command::Unknown1B, &[0x0E, 0x70])?;
+    start_transaction(device)?;
+    send_payload(device, UnknownByte::Zero, Command::Unknown3, &[0x22])?;
+    send_payload(device, UnknownByte::Zero, Command::Unknown7, &[0x38, 0x00])?;
+    send_payload(device, UnknownByte::Zero, Command::Unknown7, &[0x38, 0x38])?;
+    send_payload(device, UnknownByte::Zero, Command::Unknown7, &[0x38, 0x70])?;
+    send_payload(device, UnknownByte::Zero, Command::Unknown7, &[0x38, 0xA8])?;
+    send_payload(device, UnknownByte::One, Command::Unknown7, &[0x38, 0xE0])?;
+    send_payload(
+        device,
+        UnknownByte::Zero,
+        Command::Unknown7,
+        &[0x38, 0x18, 0x01],
+    )?;
+    send_payload(
+        device,
+        UnknownByte::Zero,
+        Command::Unknown7,
+        &[0x2A, 0x50, 0x01],
+    )?;
+    send_payload(device, UnknownByte::Zero, Command::Unknown1B, &[0x38, 0x00])?;
+    send_payload(device, UnknownByte::Zero, Command::Unknown1B, &[0x38, 0x38])?;
+    send_payload(device, UnknownByte::Zero, Command::Unknown1B, &[0x0E, 0x70])?;
+    end_transaction(device)?;
 
     Ok(())
 }
 
-pub fn init_device() -> Result<rusb::DeviceHandle<rusb::Context>> {
+/// Set LED animation from different modes
+pub fn set_led_animation<C: Into<OwnRGB8>>(
+    device: &rusb::DeviceHandle<rusb::Context>,
+    mode: LightingMode,
+    brightness: Brightness,
+    speed: Speed,
+    color: C,
+    rainbow: bool,
+) -> Result<()> {
+    let payload: Vec<u8> =
+        LedAnimationPayload::new(mode, brightness, speed, color.into(), rainbow).to_vec();
+
+    start_transaction(device)?;
+    // Send main payload
+    send_payload(device, UnknownByte::One, Command::SetAnimation, &payload)?;
+    // Send unknown / ?static? bytes
+    send_payload(
+        device,
+        UnknownByte::Zero,
+        Command::SetAnimation,
+        &[0x01, 0x18, 0x00, 0x55, 0x01],
+    )?;
+
+    end_transaction(device)?;
+    Ok(())
+}
+
+/// Set custom color for each individual key
+pub fn set_custom_colors(
+    device: &rusb::DeviceHandle<rusb::Context>,
+    key_leds: CustomKeyLeds,
+) -> Result<()> {
+    // Set custom led mode
+    set_led_animation(
+        device,
+        LightingMode::Custom,
+        Brightness::Full,
+        Speed::Slow,
+        OwnRGB8::default(),
+        false,
+    )?;
+
+    for payload in key_leds.get_payloads()? {
+        send_payload(
+            device,
+            UnknownByte::Zero,
+            Command::SetCustomLED,
+            &payload.to_vec(),
+        )?;
+    }
+
+    Ok(())
+}
+
+/// Reset custom key colors to default
+pub fn reset_custom_colors(device: &rusb::DeviceHandle<rusb::Context>) -> Result<()> {
+    // Create array of blank / off LEDs
+    set_custom_colors(device, CustomKeyLeds::new())?;
+
+    // Payloads, type: 0x5
+    send_payload(device, UnknownByte::Zero, Command::Unknown5, &[0x01])?;
+    send_payload(device, UnknownByte::Zero, Command::Unknown5, &[0x19])?;
+    Ok(())
+}
+
+/// Find supported Cherry USB keyboard
+pub fn find_device() -> Result<rusb::DeviceHandle<rusb::Context>> {
     // Search / init usb keyboard
     let ctx = rusb::Context::new().context("Failed to create libusb context")?;
 
-    let mut device_handle = ctx
-        .open_device_with_vid_pid(USB_VID, USB_PID)
+    let device_handle = ctx
+        .open_device_with_vid_pid(CHERRY_USB_VID, G30_3000N_RGB_TKL_USB_PID)
         .context("Keyboard not found")?;
 
+    Ok(device_handle)
+}
+
+/// Init USB device by verifying number of configurations and claiming appropriate interface
+pub fn init_device(device_handle: &mut rusb::DeviceHandle<rusb::Context>) -> Result<()> {
     let device = device_handle.device();
     let device_desc = device
         .device_descriptor()
@@ -222,7 +211,7 @@ pub fn init_device() -> Result<rusb::DeviceHandle<rusb::Context>> {
         .active_config_descriptor()
         .context("Failed to get config descriptor")?;
 
-    println!(
+    log::debug!(
         "* Connected to: Bus {:03} Device {:03} ID {:04x}:{:04x}",
         device.bus_number(),
         device.address(),
@@ -247,12 +236,14 @@ pub fn init_device() -> Result<rusb::DeviceHandle<rusb::Context>> {
         .claim_interface(INTERFACE_NUM)
         .context("Failed to claim interface")?;
 
-    Ok(device_handle)
+    Ok(())
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use binrw::BinReaderExt;
+    use std::io::Cursor;
 
     /// Some captures packets
     fn packets() -> Vec<&'static str> {
@@ -314,7 +305,9 @@ mod tests {
                 hex::decode(pkt_str.replace(" ", "")).expect("Failed to convert pkt hexstream");
 
             let expected_checksum = pkt[1];
-            let calcd_checksum = calc_checksum(&pkt[3..]);
+            let mut cursor = Cursor::new(&pkt[3..]);
+            let command: Command = cursor.read_ne().expect("Failed to read command");
+            let calcd_checksum = calc_checksum(command, &pkt[4..]);
 
             assert_eq!(
                 expected_checksum, calcd_checksum,
@@ -326,24 +319,92 @@ mod tests {
 
     #[test]
     fn serialize_rgb8() {
-        assert_eq!(
-            RGB8 {
-                r: 232,
-                g: 211,
-                b: 75
-            }
-            .as_slice(),
-            &[232, 211, 75]
-        );
-        assert_eq!(
-            RGB8 {
-                r: 232,
-                g: 0,
-                b: 75
-            }
-            .as_slice(),
-            &[232, 0, 75]
-        );
+        #[rustfmt::skip]
+        assert_eq!(RGB8 {r: 232,g: 211,b: 75}.as_slice(),&[232, 211, 75]);
+        #[rustfmt::skip]
+        assert_eq!(RGB8 {r: 232, g: 0, b: 75}.as_slice(), &[232, 0, 75]);
+        #[rustfmt::skip]
         assert_eq!(RGB8 { r: 0, g: 0, b: 75 }.as_slice(), &[0, 0, 75]);
+    }
+
+    #[test]
+    fn serialize_led_animation_payload() {
+        let buf: Vec<u8> = LedAnimationPayload::new(
+            LightingMode::Vortex,
+            Brightness::Full,
+            Speed::VerySlow,
+            OwnRGB8::new(244, 255, 100),
+            false,
+        )
+        .to_vec();
+        assert_eq!(
+            vec![0x09, 0x00, 0x00, 0x55, 0x00, 0x05, 0x04, 0x04, 0x00, 0x00, 0xF4, 0xFF, 0x64],
+            buf
+        );
+        let buf: Vec<u8> = LedAnimationPayload::new(
+            LightingMode::Vortex,
+            Brightness::Full,
+            Speed::VerySlow,
+            OwnRGB8::new(244, 255, 100),
+            true,
+        )
+        .to_vec();
+        assert_eq!(
+            vec![0x09, 0x00, 0x00, 0x55, 0x00, 0x05, 0x04, 0x04, 0x00, 0x01, 0xF4, 0xFF, 0x64],
+            buf
+        );
+        let buf: Vec<u8> = LedAnimationPayload::new(
+            LightingMode::Rolling,
+            Brightness::Full,
+            Speed::VerySlow,
+            OwnRGB8::new(244, 255, 100),
+            false,
+        )
+        .to_vec();
+        assert_eq!(
+            vec![0x09, 0x00, 0x00, 0x55, 0x00, 0x0A, 0x04, 0x04, 0x00, 0x00, 0xF4, 0xFF, 0x64],
+            buf
+        );
+        let buf: Vec<u8> = LedAnimationPayload::new(
+            LightingMode::Vortex,
+            Brightness::Full,
+            Speed::Medium,
+            OwnRGB8::new(244, 255, 100),
+            false,
+        )
+        .to_vec();
+        assert_eq!(
+            vec![0x09, 0x00, 0x00, 0x55, 0x00, 0x05, 0x04, 0x02, 0x00, 0x00, 0xF4, 0xFF, 0x64],
+            buf
+        );
+        let buf: Vec<u8> = LedAnimationPayload::new(
+            LightingMode::Vortex,
+            Brightness::Low,
+            Speed::Medium,
+            OwnRGB8::new(244, 255, 100),
+            false,
+        )
+        .to_vec();
+        assert_eq!(
+            vec![0x09, 0x00, 0x00, 0x55, 0x00, 0x05, 0x01, 0x02, 0x00, 0x00, 0xF4, 0xFF, 0x64],
+            buf
+        );
+    }
+
+    #[test]
+    fn prep_packet() {
+        assert_eq!(
+            prepare_packet(UnknownByte::Three, Command::TransactionStart, &[0x42, 0x94]).unwrap()
+                [..6],
+            vec![0x04, 0xD7, 0x03, 0x01, 0x42, 0x94]
+        );
+        assert_eq!(
+            prepare_packet(UnknownByte::One, Command::TransactionStart, &[0x47]).unwrap()[..5],
+            vec![0x04, 0x48, 0x01, 0x01, 0x47]
+        );
+        assert_eq!(
+            prepare_packet(UnknownByte::Three, Command::SetAnimation, &[]).unwrap()[..4],
+            vec![0x04, 0x06, 0x03, 0x06]
+        );
     }
 }
