@@ -8,6 +8,19 @@
 Tested with
 * Cherry Keyboard G80-3000N RGB (046a:00dd)
 
+## Features
+
+Done
+
+* Set LED animation
+* Set single-/multi-color (rainbow)
+* Set LED brightness
+* Set LED color per key
+
+Missing
+
+* Individual keymapping
+
 ## Library
 
 Please see [Docs.rs](https://docs.rs/cherryrgb)
