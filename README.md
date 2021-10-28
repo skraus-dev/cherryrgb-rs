@@ -10,7 +10,7 @@ Tested with
 
 ## Library
 
-Please see [cherryrgb](cherryrgb/README.md) or [Docs.rs](https://docs.rs/cherryrgb)
+Please see [Docs.rs](https://docs.rs/cherryrgb)
 
 ## CLI
 
