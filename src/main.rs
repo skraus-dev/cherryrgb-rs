@@ -1,5 +1,5 @@
 use anyhow::{Context, Result};
-use cherryrgb::{self, Brightness, CustomKeyLeds, LightingMode, OwnRGB8, Speed, RGB8};
+use cherryrgb::{self, rgb, Brightness, CustomKeyLeds, LightingMode, OwnRGB8, Speed};
 use structopt::StructOpt;
 
 #[derive(StructOpt, Debug)]
@@ -77,7 +77,7 @@ fn main() -> Result<()> {
         CliCommand::Animation(args) => {
             let color = args
                 .color
-                .or_else(|| Some(RGB8::new(255, 255, 255).into()))
+                .or_else(|| Some(rgb::RGB8::new(255, 255, 255).into()))
                 .unwrap();
 
             log::info!(

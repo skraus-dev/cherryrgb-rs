@@ -5,6 +5,7 @@ mod extensions;
 mod models;
 
 use anyhow::{Context, Result};
+use rusb::UsbContext;
 use std::time::Duration;
 
 // Re-exports
@@ -14,8 +15,8 @@ pub use models::{
     Brightness, Command, CustomKeyLeds, LedAnimationPayload, LightingMode, Packet, Speed,
     UnknownByte,
 };
-pub use rgb::{ComponentSlice, RGB, RGB8};
-pub use rusb::{self, UsbContext};
+pub use rgb;
+pub use rusb;
 
 // Constants
 const CHERRY_USB_VID: u16 = 0x046a;
@@ -243,6 +244,7 @@ pub fn init_device(device_handle: &mut rusb::DeviceHandle<rusb::Context>) -> Res
 mod tests {
     use super::*;
     use binrw::BinReaderExt;
+    use rgb::{ComponentSlice, RGB8};
     use std::io::Cursor;
 
     /// Some captures packets

@@ -7,6 +7,7 @@ use std::{
 
 /// Shorthand for structs implementing BinWrite to serialize into Vec<u8>
 pub trait ToVec: BinWrite {
+    /// Shorthand for serializing into a Vec
     fn to_vec(self) -> Vec<u8>;
 }
 
@@ -15,7 +16,6 @@ where
     <T as BinWrite>::Args: Default,
     T: BinWrite,
 {
-    /// Shorthand for serializing into a Vec
     fn to_vec(self) -> Vec<u8> {
         let mut buf = Cursor::new(Vec::new());
         self.write_to(&mut buf).unwrap();
@@ -23,10 +23,12 @@ where
     }
 }
 
+/// Wrap around RGB8 type, to implement traits on it
 #[derive(Clone, Debug)]
 pub struct OwnRGB8(RGB8);
 
 impl OwnRGB8 {
+    /// Create new instance by providing values for red, green, blue
     pub fn new(r: u8, g: u8, b: u8) -> Self {
         Self {
             0: RGB8 { r, g, b },

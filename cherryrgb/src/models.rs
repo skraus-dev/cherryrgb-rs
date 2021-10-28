@@ -7,18 +7,26 @@ use crate::{
 use anyhow::{anyhow, Result};
 use binrw::{binrw, BinWrite, BinWriterExt};
 
-// Commands
+/// Commands
 #[binrw]
 #[brw(repr = u8)]
 #[derive(Clone, Eq, PartialEq, Debug)]
 pub enum Command {
+    /// Start LED transaction
     TransactionStart = 0x01,
+    /// End LED transaction
     TransactionEnd = 0x02,
+    /// Unknown
     Unknown3 = 0x03,
+    /// Unknown
     Unknown5 = 0x05,
+    /// Set LED animation
     SetAnimation = 0x06,
+    /// Unknown
     Unknown7 = 0x07,
+    /// Set custom LED color per key
     SetCustomLED = 0x0B,
+    /// Unknown
     Unknown1B = 0x1B,
 }
 
@@ -179,6 +187,7 @@ impl Packet {
         }
     }
 
+    /// Set payload
     pub fn set_payload(&mut self, new_data: &[u8]) -> Result<()> {
         if new_data.len() > 60 {
             return Err(anyhow!("Payload exceeds 60 bytes"));
@@ -190,10 +199,12 @@ impl Packet {
         Ok(())
     }
 
+    /// Update checksum
     pub fn update_checksum(&mut self) {
         self.checksum = calc_checksum(self.command.clone(), &self.data);
     }
 
+    /// Verify checksum
     pub fn verify_checksum(&self) -> Result<()> {
         let calculated = calc_checksum(self.command.clone(), &self.data);
         if calculated == self.checksum {
@@ -208,14 +219,14 @@ impl Packet {
     }
 }
 
-/* LED Animation payload
-///
-///               brightness  rainbow
-///                    |         |   COLOR
-///                mode|speed    |  R  G  B
-///                 |  |  |      |  |  |  |
-///                 v  v  v      v  v  v  v
-/// "09 00 00 55 00 12 03 03 00 00 7E 00 F4"
+/// LED Animation payload
+/*
+              brightness  rainbow
+                   |         |   COLOR
+               mode|speed    |  R  G  B
+                |  |  |      |  |  |  |
+                v  v  v      v  v  v  v
+"09 00 00 55 00 12 03 03 00 00 7E 00 F4"
 */
 #[binrw]
 #[derive(Debug)]
@@ -250,6 +261,7 @@ impl LedAnimationPayload {
     }
 }
 
+/// Payload to set custom color per key
 #[binrw]
 #[derive(Debug)]
 pub struct LedCustomPayload {
@@ -263,6 +275,7 @@ pub struct LedCustomPayload {
     key_leds_data: Vec<u8>,
 }
 
+/// Wrapper around custom LED color for all keys
 #[derive(Default, Debug)]
 pub struct CustomKeyLeds {
     key_leds: Vec<OwnRGB8>,
@@ -289,6 +302,7 @@ impl CustomKeyLeds {
     const CHUNK_SIZE: usize = 56;
     const TOTAL_KEYS: usize = 126;
 
+    /// Initialize with inactive colors (000000) for all keys
     pub fn new() -> Self {
         Self {
             key_leds: (0..CustomKeyLeds::TOTAL_KEYS)
@@ -298,6 +312,7 @@ impl CustomKeyLeds {
         }
     }
 
+    /// Initialize from collection of RGB8 values
     pub fn from_leds<C: Into<OwnRGB8>>(key_leds: Vec<C>) -> Result<Self> {
         if key_leds.len() > CustomKeyLeds::TOTAL_KEYS {
             return Err(anyhow!("Invalid number of key leds"));
@@ -308,6 +323,7 @@ impl CustomKeyLeds {
         })
     }
 
+    /// Set color for particular key at provided index
     pub fn set_led<C: Into<OwnRGB8>>(&mut self, key_index: usize, key: C) -> Result<()> {
         if key_index >= self.key_leds.len() {
             return Err(anyhow!("Key index out of bounds"));
@@ -317,6 +333,7 @@ impl CustomKeyLeds {
         Ok(())
     }
 
+    /// Get array of payloads to be then provided to `send_payload`
     pub fn get_payloads(self) -> Result<Vec<LedCustomPayload>> {
         let key_data = self.to_vec();
 
