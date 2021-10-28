@@ -4,7 +4,7 @@
 
 Find usb keyboard and initialize it
 
-```rs
+```rust
 // Optionally, filter for product id if you have more than one cherry device.
 let devices = cherryrgb::find_devices(Some(0x00dd)).unwrap();
 let (vendor_id, product_id) = devices.first().unwrap().to_owned();
@@ -15,7 +15,7 @@ cherryrgb::fetch_device_state(&device_handle).unwrap();
 
 Set LED animation
 
-```rs
+```rust
 // Create color: green
 let color = cherryrgb::RGB8::new(0, 0xff, 0);
 let use_rainbow_colors: bool = false;
@@ -32,7 +32,7 @@ cherryrgb::set_led_animation(
 ```
 
 Set custom colors
-```rs
+```rust
 // Reset all colors first
 cherryrgb::reset_custom_colors(&device_handle).unwrap();
 
