@@ -1,7 +1,58 @@
+//! Library to interact with Cherry RGB keyboards
+//!
+//! # Usage
+//!
+//! Find usb keyboard and initialize it
+//! ```rust no_run
+//! use cherryrgb::{self, CherryKeyboard};
+//!
+//! // Optionally, filter for product id if you have more than one cherry device.
+//! let devices = cherryrgb::find_devices(Some(0x00dd)).unwrap();
+//! let (vendor_id, product_id) = devices.first().unwrap().to_owned();
+//! let keyboard = CherryKeyboard::new(vendor_id, product_id).unwrap();
+//!
+//! keyboard.fetch_device_state().unwrap();
+//! ```
+//!
+//! Set LED animation
+//! ```rust no_run
+//! # let keyboard = cherryrgb::CherryKeyboard::new(0, 0).unwrap();
+//! use cherryrgb::rgb::RGB8;
+//!
+//! // Create color: green
+//! let color = RGB8::new(0, 0xff, 0);
+//! let use_rainbow_colors: bool = false;
+//!
+//! keyboard.set_led_animation(
+//!     cherryrgb::LightingMode::Rain,
+//!     cherryrgb::Brightness::Full,
+//!     cherryrgb::Speed::Slow,
+//!     color,
+//!     use_rainbow_colors,
+//! )
+//! .unwrap();
+//! ```
+//!
+//! Set custom LED color for individual key(s)
+//! ```rust no_run
+//! # let keyboard = cherryrgb::CherryKeyboard::new(0, 0).unwrap();
+//! use cherryrgb::rgb::RGB8;
+//!
+//! // Reset all colors first
+//! keyboard.reset_custom_colors().unwrap();
+//!
+//! // Create color: green
+//! let color = RGB8::new(0, 0xff, 0);
+//!
+//! // Create keys struct and set key with index 42 to desired color
+//! let mut keys = cherryrgb::CustomKeyLeds::new();
+//! keys.set_led(42, color).unwrap();
+//!
+//! // Send packets to keyboard
+//! keyboard.set_custom_colors(keys).unwrap();
+//! ```
+
 mod extensions;
-/// CHERRY G80-3000N RGB TKL experiments
-/// No warranty or liability for possible damages
-/// Use at your own risk!
 mod models;
 
 use anyhow::{anyhow, Context, Result};
@@ -45,153 +96,6 @@ fn prepare_packet(unknown: UnknownByte, command: Command, payload: &[u8]) -> Res
     Ok(packet.to_vec())
 }
 
-/// Writes a control packet first, then reads interrupt packet
-fn send_payload(
-    device: &rusb::DeviceHandle<rusb::Context>,
-    unknown: UnknownByte,
-    command: Command,
-    payload: &[u8],
-) -> Result<Vec<u8>> {
-    // Prepend magic + checksum
-    let packet = prepare_packet(unknown, command, payload)?;
-
-    let mut response = [0u8; 64];
-    device
-        .write_control(
-            rusb::request_type(
-                rusb::Direction::Out,
-                rusb::RequestType::Class,
-                rusb::Recipient::Interface,
-            ),
-            0x09,    // Request - SET_REPORT
-            0x0204,  // Value - ReportId: 4, ReportType: Output
-            0x0001,  // Index
-            &packet, // Data
-            TIMEOUT,
-        )
-        .context("Control Write failure")?;
-    log::debug!("# >> CONTROL TRANSFER\n{:?}\n", hex::encode(&packet));
-
-    device
-        .read_interrupt(
-            INTERRUPT_EP,  // Endpoint
-            &mut response, // read buffer
-            TIMEOUT,
-        )
-        .context("Interrupt read failure")?;
-    log::debug!("# << INTERRUPT TRANSFER\n{:?}\n", hex::encode(&response));
-
-    Ok(response.to_vec())
-}
-
-/// Start RGB setting transaction
-fn start_transaction(device: &rusb::DeviceHandle<rusb::Context>) -> Result<()> {
-    send_payload(device, UnknownByte::Zero, Command::TransactionStart, &[])?;
-
-    Ok(())
-}
-
-/// End RGB setting transaction
-fn end_transaction(device: &rusb::DeviceHandle<rusb::Context>) -> Result<()> {
-    send_payload(device, UnknownByte::Zero, Command::TransactionEnd, &[])?;
-
-    Ok(())
-}
-
-/// Just taken 1:1 from usb capture
-pub fn fetch_device_state(device: &rusb::DeviceHandle<rusb::Context>) -> Result<()> {
-    start_transaction(device)?;
-    send_payload(device, UnknownByte::Zero, Command::Unknown3, &[0x22])?;
-    send_payload(device, UnknownByte::Zero, Command::Unknown7, &[0x38, 0x00])?;
-    send_payload(device, UnknownByte::Zero, Command::Unknown7, &[0x38, 0x38])?;
-    send_payload(device, UnknownByte::Zero, Command::Unknown7, &[0x38, 0x70])?;
-    send_payload(device, UnknownByte::Zero, Command::Unknown7, &[0x38, 0xA8])?;
-    send_payload(device, UnknownByte::One, Command::Unknown7, &[0x38, 0xE0])?;
-    send_payload(
-        device,
-        UnknownByte::Zero,
-        Command::Unknown7,
-        &[0x38, 0x18, 0x01],
-    )?;
-    send_payload(
-        device,
-        UnknownByte::Zero,
-        Command::Unknown7,
-        &[0x2A, 0x50, 0x01],
-    )?;
-    send_payload(device, UnknownByte::Zero, Command::Unknown1B, &[0x38, 0x00])?;
-    send_payload(device, UnknownByte::Zero, Command::Unknown1B, &[0x38, 0x38])?;
-    send_payload(device, UnknownByte::Zero, Command::Unknown1B, &[0x0E, 0x70])?;
-    end_transaction(device)?;
-
-    Ok(())
-}
-
-/// Set LED animation from different modes
-pub fn set_led_animation<C: Into<OwnRGB8>>(
-    device: &rusb::DeviceHandle<rusb::Context>,
-    mode: LightingMode,
-    brightness: Brightness,
-    speed: Speed,
-    color: C,
-    rainbow: bool,
-) -> Result<()> {
-    let payload: Vec<u8> =
-        LedAnimationPayload::new(mode, brightness, speed, color.into(), rainbow).to_vec();
-
-    start_transaction(device)?;
-    // Send main payload
-    send_payload(device, UnknownByte::One, Command::SetAnimation, &payload)?;
-    // Send unknown / ?static? bytes
-    send_payload(
-        device,
-        UnknownByte::Zero,
-        Command::SetAnimation,
-        &[0x01, 0x18, 0x00, 0x55, 0x01],
-    )?;
-
-    end_transaction(device)?;
-    Ok(())
-}
-
-/// Set custom color for each individual key
-pub fn set_custom_colors(
-    device: &rusb::DeviceHandle<rusb::Context>,
-    key_leds: CustomKeyLeds,
-) -> Result<()> {
-    // Set custom led mode
-    set_led_animation(
-        device,
-        LightingMode::Custom,
-        Brightness::Full,
-        Speed::Slow,
-        OwnRGB8::default(),
-        false,
-    )?;
-
-    for payload in key_leds.get_payloads()? {
-        send_payload(
-            device,
-            UnknownByte::Zero,
-            Command::SetCustomLED,
-            &payload.to_vec(),
-        )?;
-    }
-
-    Ok(())
-}
-
-/// Reset custom key colors to default
-pub fn reset_custom_colors(device: &rusb::DeviceHandle<rusb::Context>) -> Result<()> {
-    // Create array of blank / off LEDs
-    set_custom_colors(device, CustomKeyLeds::new())?;
-
-    // Payloads, type: 0x5
-    send_payload(device, UnknownByte::Zero, Command::Unknown5, &[0x01])?;
-    send_payload(device, UnknownByte::Zero, Command::Unknown5, &[0x19])?;
-    Ok(())
-}
-
 /// Find supported Cherry USB keyboards and return collection of (vendor_id, product_id)
 pub fn find_devices(product_id: Option<u16>) -> Result<Vec<(u16, u16)>> {
     let devices = rusb::devices()?;
@@ -215,48 +119,182 @@ pub fn find_devices(product_id: Option<u16>) -> Result<Vec<(u16, u16)>> {
     Ok(usb_ids)
 }
 
-/// Init USB device by verifying number of configurations and claiming appropriate interface
-pub fn init_device(vendor_id: u16, product_id: u16) -> Result<rusb::DeviceHandle<rusb::Context>> {
-    let ctx = rusb::Context::new().context("Failed to create libusb context")?;
+/// Holds a handle to the USB keyboard device
+pub struct CherryKeyboard {
+    device_handle: rusb::DeviceHandle<rusb::Context>,
+}
 
-    let mut device_handle = ctx
-        .open_device_with_vid_pid(vendor_id, product_id)
-        .context("Keyboard not found")?;
+impl CherryKeyboard {
+    /// Init USB device by verifying number of configurations and claiming appropriate interface
+    pub fn new(vendor_id: u16, product_id: u16) -> Result<Self> {
+        let ctx = rusb::Context::new().context("Failed to create libusb context")?;
 
-    let device = device_handle.device();
-    let device_desc = device
-        .device_descriptor()
-        .context("Failed to read device descriptor")?;
-    let config_desc = device
-        .active_config_descriptor()
-        .context("Failed to get config descriptor")?;
+        let mut device_handle = ctx
+            .open_device_with_vid_pid(vendor_id, product_id)
+            .context("Keyboard not found")?;
 
-    log::debug!(
-        "* Connected to: Bus {:03} Device {:03} ID {:04x}:{:04x}",
-        device.bus_number(),
-        device.address(),
-        device_desc.vendor_id(),
-        device_desc.product_id()
-    );
+        let device = device_handle.device();
+        let device_desc = device
+            .device_descriptor()
+            .context("Failed to read device descriptor")?;
+        let config_desc = device
+            .active_config_descriptor()
+            .context("Failed to get config descriptor")?;
 
-    assert_eq!(device_desc.num_configurations(), 1);
-    assert_eq!(config_desc.num_interfaces(), 2);
+        log::debug!(
+            "* Connected to: Bus {:03} Device {:03} ID {:04x}:{:04x}",
+            device.bus_number(),
+            device.address(),
+            device_desc.vendor_id(),
+            device_desc.product_id()
+        );
 
-    let kernel_driver_active = device_handle
-        .kernel_driver_active(INTERFACE_NUM)
-        .context("kernel_driver_active")?;
+        assert_eq!(device_desc.num_configurations(), 1);
+        assert_eq!(config_desc.num_interfaces(), 2);
 
-    if kernel_driver_active {
+        let kernel_driver_active = device_handle
+            .kernel_driver_active(INTERFACE_NUM)
+            .context("kernel_driver_active")?;
+
+        if kernel_driver_active {
+            device_handle
+                .detach_kernel_driver(INTERFACE_NUM)
+                .context("Failed to detach active kernel driver")?;
+        }
+
         device_handle
-            .detach_kernel_driver(INTERFACE_NUM)
-            .context("Failed to detach active kernel driver")?;
+            .claim_interface(INTERFACE_NUM)
+            .context("Failed to claim interface")?;
+
+        Ok(Self { device_handle })
     }
 
-    device_handle
-        .claim_interface(INTERFACE_NUM)
-        .context("Failed to claim interface")?;
+    /// Writes a control packet first, then reads interrupt packet
+    fn send_payload(
+        &self,
+        unknown: UnknownByte,
+        command: Command,
+        payload: &[u8],
+    ) -> Result<Vec<u8>> {
+        // Prepend magic + checksum
+        let packet = prepare_packet(unknown, command, payload)?;
 
-    Ok(device_handle)
+        let mut response = [0u8; 64];
+        self.device_handle
+            .write_control(
+                rusb::request_type(
+                    rusb::Direction::Out,
+                    rusb::RequestType::Class,
+                    rusb::Recipient::Interface,
+                ),
+                0x09,    // Request - SET_REPORT
+                0x0204,  // Value - ReportId: 4, ReportType: Output
+                0x0001,  // Index
+                &packet, // Data
+                TIMEOUT,
+            )
+            .context("Control Write failure")?;
+        log::debug!("# >> CONTROL TRANSFER\n{:?}\n", hex::encode(&packet));
+
+        self.device_handle
+            .read_interrupt(
+                INTERRUPT_EP,  // Endpoint
+                &mut response, // read buffer
+                TIMEOUT,
+            )
+            .context("Interrupt read failure")?;
+        log::debug!("# << INTERRUPT TRANSFER\n{:?}\n", hex::encode(&response));
+
+        Ok(response.to_vec())
+    }
+
+    /// Start RGB setting transaction
+    fn start_transaction(&self) -> Result<()> {
+        self.send_payload(UnknownByte::Zero, Command::TransactionStart, &[])?;
+
+        Ok(())
+    }
+
+    /// End RGB setting transaction
+    fn end_transaction(&self) -> Result<()> {
+        self.send_payload(UnknownByte::Zero, Command::TransactionEnd, &[])?;
+
+        Ok(())
+    }
+
+    /// Just taken 1:1 from usb capture
+    pub fn fetch_device_state(&self) -> Result<()> {
+        self.start_transaction()?;
+        self.send_payload(UnknownByte::Zero, Command::Unknown3, &[0x22])?;
+        self.send_payload(UnknownByte::Zero, Command::Unknown7, &[0x38, 0x00])?;
+        self.send_payload(UnknownByte::Zero, Command::Unknown7, &[0x38, 0x38])?;
+        self.send_payload(UnknownByte::Zero, Command::Unknown7, &[0x38, 0x70])?;
+        self.send_payload(UnknownByte::Zero, Command::Unknown7, &[0x38, 0xA8])?;
+        self.send_payload(UnknownByte::One, Command::Unknown7, &[0x38, 0xE0])?;
+        self.send_payload(UnknownByte::Zero, Command::Unknown7, &[0x38, 0x18, 0x01])?;
+        self.send_payload(UnknownByte::Zero, Command::Unknown7, &[0x2A, 0x50, 0x01])?;
+        self.send_payload(UnknownByte::Zero, Command::Unknown1B, &[0x38, 0x00])?;
+        self.send_payload(UnknownByte::Zero, Command::Unknown1B, &[0x38, 0x38])?;
+        self.send_payload(UnknownByte::Zero, Command::Unknown1B, &[0x0E, 0x70])?;
+        self.end_transaction()?;
+
+        Ok(())
+    }
+
+    /// Set LED animation from different modes
+    pub fn set_led_animation<C: Into<OwnRGB8>>(
+        &self,
+        mode: LightingMode,
+        brightness: Brightness,
+        speed: Speed,
+        color: C,
+        rainbow: bool,
+    ) -> Result<()> {
+        let payload: Vec<u8> =
+            LedAnimationPayload::new(mode, brightness, speed, color.into(), rainbow).to_vec();
+
+        self.start_transaction()?;
+        // Send main payload
+        self.send_payload(UnknownByte::One, Command::SetAnimation, &payload)?;
+        // Send unknown / ?static? bytes
+        self.send_payload(
+            UnknownByte::Zero,
+            Command::SetAnimation,
+            &[0x01, 0x18, 0x00, 0x55, 0x01],
+        )?;
+
+        self.end_transaction()?;
+        Ok(())
+    }
+
+    /// Set custom color for each individual key
+    pub fn set_custom_colors(&self, key_leds: CustomKeyLeds) -> Result<()> {
+        // Set custom led mode
+        self.set_led_animation(
+            LightingMode::Custom,
+            Brightness::Full,
+            Speed::Slow,
+            OwnRGB8::default(),
+            false,
+        )?;
+
+        for payload in key_leds.get_payloads()? {
+            self.send_payload(UnknownByte::Zero, Command::SetCustomLED, &payload.to_vec())?;
+        }
+
+        Ok(())
+    }
+
+    /// Reset custom key colors to default
+    pub fn reset_custom_colors(&self) -> Result<()> {
+        // Create array of blank / off LEDs
+        self.set_custom_colors(CustomKeyLeds::new())?;
+
+        // Payloads, type: 0x5
+        self.send_payload(UnknownByte::Zero, Command::Unknown5, &[0x01])?;
+        self.send_payload(UnknownByte::Zero, Command::Unknown5, &[0x19])?;
+        Ok(())
+    }
 }
 
 #[cfg(test)]

@@ -1,5 +1,7 @@
 use anyhow::{anyhow, Context, Result};
-use cherryrgb::{self, rgb, Brightness, CustomKeyLeds, LightingMode, OwnRGB8, Speed};
+use cherryrgb::{
+    self, rgb, Brightness, CherryKeyboard, CustomKeyLeds, LightingMode, OwnRGB8, Speed,
+};
 use structopt::StructOpt;
 
 #[derive(StructOpt, Debug)]
@@ -65,11 +67,13 @@ fn main() -> Result<()> {
     }
 
     let (vendor_id, product_id) = devices.first().unwrap().to_owned();
-    let device_handle =
-        cherryrgb::init_device(vendor_id, product_id).context("Failed to init keyboard")?;
+    let keyboard =
+        CherryKeyboard::new(vendor_id, product_id).context("Failed to create keyboard")?;
 
     /* Fun begins */
-    cherryrgb::fetch_device_state(&device_handle).context("Fetching device state failed")?;
+    keyboard
+        .fetch_device_state()
+        .context("Fetching device state failed")?;
 
     let loglevel = if opt.debug {
         log::Level::Debug
@@ -80,7 +84,7 @@ fn main() -> Result<()> {
 
     match opt.command {
         CliCommand::CustomColors(args) => {
-            cherryrgb::reset_custom_colors(&device_handle)?;
+            keyboard.reset_custom_colors()?;
 
             let mut keys = CustomKeyLeds::new();
 
@@ -88,7 +92,7 @@ fn main() -> Result<()> {
                 keys.set_led(index, color)?;
             }
 
-            cherryrgb::set_custom_colors(&device_handle, keys)?;
+            keyboard.set_custom_colors(keys)?;
         }
         CliCommand::Animation(args) => {
             let color = args
@@ -104,15 +108,9 @@ fn main() -> Result<()> {
                 color
             );
 
-            cherryrgb::set_led_animation(
-                &device_handle,
-                args.mode,
-                opt.brightness,
-                args.speed,
-                color,
-                args.rainbow,
-            )
-            .context("Failed to set led animation")?;
+            keyboard
+                .set_led_animation(args.mode, opt.brightness, args.speed, color, args.rainbow)
+                .context("Failed to set led animation")?;
         }
     }
 
