@@ -9,5 +9,9 @@ edition = "2018"
 cherryrgb = { path = "cherryrgb" }
 anyhow = "1.0"
 structopt = "0.3"
-simple_logger = "1.13"
 log = "0.4"
+
+[dependencies.simple_logger]
+version = "1.13"
+default-features = false
+features = ["colors"]
