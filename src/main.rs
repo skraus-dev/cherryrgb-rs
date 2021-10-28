@@ -1,4 +1,4 @@
-use anyhow::{Context, Result};
+use anyhow::{anyhow, Context, Result};
 use cherryrgb::{self, rgb, Brightness, CustomKeyLeds, LightingMode, OwnRGB8, Speed};
 use structopt::StructOpt;
 
@@ -36,6 +36,9 @@ struct Opt {
     #[structopt(short, long)]
     debug: bool,
 
+    #[structopt(long)]
+    product_id: Option<u16>,
+
     // Subcommand
     #[structopt(subcommand)]
     command: CliCommand,
@@ -49,8 +52,21 @@ fn main() -> Result<()> {
     let opt = Opt::from_args();
 
     // Search / init usb keyboard
-    let mut device_handle = cherryrgb::find_device().context("Failed to find keyboard")?;
-    cherryrgb::init_device(&mut device_handle).context("Failed to init keyboard")?;
+    let devices =
+        cherryrgb::find_devices(opt.product_id).context("Failed to find any cherry keyboard")?;
+
+    if devices.len() > 1 {
+        for (index, &dev) in devices.iter().enumerate() {
+            println!("{}) VEN_ID={}, PROD_ID={}", index, dev.0, dev.1);
+        }
+        return Err(anyhow!(
+            "More than one keyboard found, please provide --product-id"
+        ));
+    }
+
+    let (vendor_id, product_id) = devices.first().unwrap().to_owned();
+    let device_handle =
+        cherryrgb::init_device(vendor_id, product_id).context("Failed to init keyboard")?;
 
     /* Fun begins */
     cherryrgb::fetch_device_state(&device_handle).context("Fetching device state failed")?;

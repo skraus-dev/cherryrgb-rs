@@ -5,8 +5,11 @@
 Find usb keyboard and initialize it
 
 ```rs
-let mut device_handle = cherryrgb::find_device().unwrap();
-cherryrgb::init_device(&mut device_handle).unwrap();
+// Optionally, filter for product id if you have more than one cherry device.
+let devices = cherryrgb::find_devices(Some(0x00dd)).unwrap();
+let (vendor_id, product_id) = devices.first().unwrap().to_owned();
+let device_handle = cherryrgb::init_device(vendor_id, product_id).unwrap()
+
 cherryrgb::fetch_device_state(&device_handle).unwrap();
 ```
 

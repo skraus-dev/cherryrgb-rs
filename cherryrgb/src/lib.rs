@@ -4,7 +4,7 @@ mod extensions;
 /// Use at your own risk!
 mod models;
 
-use anyhow::{Context, Result};
+use anyhow::{anyhow, Context, Result};
 use rusb::UsbContext;
 use std::time::Duration;
 
@@ -19,8 +19,10 @@ pub use rgb;
 pub use rusb;
 
 // Constants
-const CHERRY_USB_VID: u16 = 0x046a;
-const G30_3000N_RGB_TKL_USB_PID: u16 = 0x00dd;
+/// USB Vendor ID - Cherry GmbH
+pub const CHERRY_USB_VID: u16 = 0x046a;
+/// USB Product ID - G80-3000N RGB TKL Keyboard
+pub const G80_3000N_RGB_TKL_USB_PID: u16 = 0x00dd;
 const INTERFACE_NUM: u8 = 1;
 const INTERRUPT_EP: u8 = 0x82;
 static TIMEOUT: Duration = Duration::from_millis(1000);
@@ -190,20 +192,37 @@ pub fn reset_custom_colors(device: &rusb::DeviceHandle<rusb::Context>) -> Result
     Ok(())
 }
 
-/// Find supported Cherry USB keyboard
-pub fn find_device() -> Result<rusb::DeviceHandle<rusb::Context>> {
-    // Search / init usb keyboard
-    let ctx = rusb::Context::new().context("Failed to create libusb context")?;
+/// Find supported Cherry USB keyboards and return collection of (vendor_id, product_id)
+pub fn find_devices(product_id: Option<u16>) -> Result<Vec<(u16, u16)>> {
+    let devices = rusb::devices()?;
+    // Search usb devices with VENDOR_ID of Cherry GmbH
+    // If product_id is provided, filter for it too
+    let usb_ids: Vec<(u16, u16)> = devices
+        .iter()
+        .map(|dev| dev.device_descriptor().unwrap())
+        .filter(|desc| desc.vendor_id() == CHERRY_USB_VID)
+        .filter(|desc| match product_id {
+            Some(prod_id) => desc.product_id() == prod_id,
+            None => true,
+        })
+        .map(|desc| (desc.vendor_id(), desc.product_id()))
+        .collect();
 
-    let device_handle = ctx
-        .open_device_with_vid_pid(CHERRY_USB_VID, G30_3000N_RGB_TKL_USB_PID)
-        .context("Keyboard not found")?;
+    if usb_ids.is_empty() {
+        return Err(anyhow!("No matching devices found"));
+    }
 
-    Ok(device_handle)
+    Ok(usb_ids)
 }
 
 /// Init USB device by verifying number of configurations and claiming appropriate interface
-pub fn init_device(device_handle: &mut rusb::DeviceHandle<rusb::Context>) -> Result<()> {
+pub fn init_device(vendor_id: u16, product_id: u16) -> Result<rusb::DeviceHandle<rusb::Context>> {
+    let ctx = rusb::Context::new().context("Failed to create libusb context")?;
+
+    let mut device_handle = ctx
+        .open_device_with_vid_pid(vendor_id, product_id)
+        .context("Keyboard not found")?;
+
     let device = device_handle.device();
     let device_desc = device
         .device_descriptor()
@@ -237,7 +256,7 @@ pub fn init_device(device_handle: &mut rusb::DeviceHandle<rusb::Context>) -> Res
         .claim_interface(INTERFACE_NUM)
         .context("Failed to claim interface")?;
 
-    Ok(())
+    Ok(device_handle)
 }
 
 #[cfg(test)]
