@@ -1,86 +1,104 @@
-use anyhow::{anyhow, Context, Result};
-use cherryrgb::{self, Brightness, Command, LightingMode, Speed, RGB8};
-use std::convert::TryFrom;
+use anyhow::{Context, Result};
+use cherryrgb::{self, Brightness, CustomKeyLeds, LightingMode, OwnRGB8, Speed, RGB8};
 use structopt::StructOpt;
 
-fn parse_color(src: &str) -> Result<RGB8> {
-    let slices = src.split(',').collect::<Vec<&str>>();
-    let val = match slices.len() {
-        3 => {
-            let r = slices[0].parse::<u8>()?;
-            let g = slices[1].parse::<u8>()?;
-            let b = slices[2].parse::<u8>()?;
-
-            RGB8 { r, g, b }
-        }
-        _ => {
-            return Err(anyhow!("Invalid slice count"));
-        }
-    };
-
-    Ok(val)
-}
-
-#[derive(Debug, StructOpt)]
-#[structopt(name = "cherryrgb", about = "Test tool for Cherry RGB Keyboard")]
-struct Opt {
+#[derive(StructOpt, Debug)]
+struct AnimationArgs {
     /// Set LED mode (range 0-15)
-    mode: u8,
+    mode: LightingMode,
 
     /// Set speed (range 0-4)
-    speed: u8,
+    speed: Speed,
 
-    /// Set brightness (range 0-4)
-    brightness: u8,
-
-    /// Color (e.g 255,255,255)
-    #[structopt(short, long, parse(try_from_str = parse_color))]
-    color: Option<RGB8>,
+    /// Color (e.g ff00ff)
+    color: Option<OwnRGB8>,
 
     /// Enable rainbow colors
     #[structopt(short, long)]
     rainbow: bool,
 }
 
+#[derive(StructOpt, Debug)]
+struct CustomColorOptions {
+    colors: Vec<OwnRGB8>,
+}
+
+#[derive(StructOpt, Debug)]
+enum CliCommand {
+    Animation(AnimationArgs),
+    CustomColors(CustomColorOptions),
+}
+
+#[derive(StructOpt, Debug)]
+#[structopt(name = "cherryrgb", about = "Test tool for Cherry RGB Keyboard")]
+struct Opt {
+    /// Enable debug output
+    #[structopt(short, long)]
+    debug: bool,
+
+    // Subcommand
+    #[structopt(subcommand)]
+    command: CliCommand,
+
+    /// Set brightness (range 0-4)
+    #[structopt(short, long, default_value = "full")]
+    brightness: Brightness,
+}
+
 fn main() -> Result<()> {
     let opt = Opt::from_args();
 
     // Search / init usb keyboard
-    let device_handle = cherryrgb::init_device().context("Failed to init keyboard")?;
+    let mut device_handle = cherryrgb::find_device().context("Failed to find keyboard")?;
+    cherryrgb::init_device(&mut device_handle).context("Failed to init keyboard")?;
 
     /* Fun begins */
-    cherryrgb::start_transaction(&device_handle)?;
-    cherryrgb::fetch_device_state(&device_handle).context("Init failed")?;
-    cherryrgb::end_transaction(&device_handle)?;
+    cherryrgb::fetch_device_state(&device_handle).context("Fetching device state failed")?;
 
-    cherryrgb::start_transaction(&device_handle)?;
+    let loglevel = if opt.debug {
+        log::Level::Debug
+    } else {
+        log::Level::Info
+    };
+    simple_logger::init_with_level(loglevel).unwrap();
 
-    let mode: LightingMode =
-        LightingMode::try_from(opt.mode).context("Failed to convert argument: LightingMode")?;
-    let speed: Speed = Speed::try_from(opt.speed).context("Failed to convert argument: Speed")?;
-    let brightness: Brightness =
-        Brightness::try_from(opt.brightness).context("Failed to convert argument: Brightness")?;
+    match opt.command {
+        CliCommand::CustomColors(args) => {
+            cherryrgb::reset_custom_colors(&device_handle)?;
 
-    println!(
-        "Setting: mode={:?} brightness={:?} speed={:?} color={:?}",
-        mode, brightness, speed, opt.color
-    );
+            let mut keys = CustomKeyLeds::new();
 
-    let payload = cherryrgb::led_payload(mode, brightness, Some(speed), opt.color, opt.rainbow);
+            for (index, color) in args.colors.into_iter().enumerate() {
+                keys.set_led(index, color)?;
+            }
 
-    println!("Setting mode...");
-    cherryrgb::send_payload(&device_handle, true, Command::SetAnimation, &payload)?;
+            cherryrgb::set_custom_colors(&device_handle, keys)?;
+        }
+        CliCommand::Animation(args) => {
+            let color = args
+                .color
+                .or_else(|| Some(RGB8::new(255, 255, 255).into()))
+                .unwrap();
 
-    // Unknown data
-    println!("Setting unknown packet...");
-    cherryrgb::send_payload(
-        &device_handle,
-        false,
-        Command::SetAnimation,
-        &[0x01, 0x18, 0x00, 0x55, 0x01],
-    )?;
+            log::info!(
+                "Setting: mode={:?} brightness={:?} speed={:?} color={:?}",
+                args.mode,
+                opt.brightness,
+                args.speed,
+                color
+            );
 
-    cherryrgb::end_transaction(&device_handle)?;
+            cherryrgb::set_led_animation(
+                &device_handle,
+                args.mode,
+                opt.brightness,
+                args.speed,
+                color,
+                args.rainbow,
+            )
+            .context("Failed to set led animation")?;
+        }
+    }
 
     Ok(())
 }
