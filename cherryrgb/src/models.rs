@@ -30,17 +30,6 @@ pub enum Command {
     Unknown1B = 0x1B,
 }
 
-/// Purpose unknown, part of packet
-#[binrw]
-#[brw(repr = u8)]
-#[derive(Eq, PartialEq, Debug)]
-pub enum UnknownByte {
-    Zero = 0,
-    One = 1,
-    Two = 2,
-    Three = 3,
-}
-
 /// Modes support:
 /// -> C: Color
 /// -> S: Speed
@@ -172,13 +161,13 @@ impl FromStr for Brightness {
 pub struct Packet {
     // magic, fixed to 0x04, see `br(magic = ...)`
     checksum: u8,
-    unknown: UnknownByte,
+    unknown: u8,
     command: Command,
     data: [u8; 60],
 }
 
 impl Packet {
-    pub fn new(unknown: UnknownByte, command: Command) -> Self {
+    pub fn new(unknown: u8, command: Command) -> Self {
         Self {
             checksum: 0,
             unknown,

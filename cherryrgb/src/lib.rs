@@ -64,7 +64,6 @@ pub use extensions::{OwnRGB8, ToVec};
 pub use hex;
 pub use models::{
     Brightness, Command, CustomKeyLeds, LedAnimationPayload, LightingMode, Packet, Speed,
-    UnknownByte,
 };
 pub use rgb;
 pub use rusb;
@@ -86,7 +85,7 @@ fn calc_checksum(command: Command, data: &[u8]) -> u8 {
 }
 
 // Prepend magic, checksum, unknown and command to payload
-fn prepare_packet(unknown: UnknownByte, command: Command, payload: &[u8]) -> Result<Vec<u8>> {
+fn prepare_packet(unknown: u8, command: Command, payload: &[u8]) -> Result<Vec<u8>> {
     let mut packet = Packet::new(unknown, command);
     // Append payload
     packet.set_payload(payload)?;
@@ -172,7 +171,7 @@ impl CherryKeyboard {
     /// Writes a control packet first, then reads interrupt packet
     fn send_payload(
         &self,
-        unknown: UnknownByte,
+        unknown: u8,
         command: Command,
         payload: &[u8],
     ) -> Result<Vec<u8>> {
@@ -210,14 +209,14 @@ impl CherryKeyboard {
 
     /// Start RGB setting transaction
     fn start_transaction(&self) -> Result<()> {
-        self.send_payload(UnknownByte::Zero, Command::TransactionStart, &[])?;
+        self.send_payload(0x0, Command::TransactionStart, &[])?;
 
         Ok(())
     }
 
     /// End RGB setting transaction
     fn end_transaction(&self) -> Result<()> {
-        self.send_payload(UnknownByte::Zero, Command::TransactionEnd, &[])?;
+        self.send_payload(0x0, Command::TransactionEnd, &[])?;
 
         Ok(())
     }
@@ -225,17 +224,17 @@ impl CherryKeyboard {
     /// Just taken 1:1 from usb capture
     pub fn fetch_device_state(&self) -> Result<()> {
         self.start_transaction()?;
-        self.send_payload(UnknownByte::Zero, Command::Unknown3, &[0x22])?;
-        self.send_payload(UnknownByte::Zero, Command::Unknown7, &[0x38, 0x00])?;
-        self.send_payload(UnknownByte::Zero, Command::Unknown7, &[0x38, 0x38])?;
-        self.send_payload(UnknownByte::Zero, Command::Unknown7, &[0x38, 0x70])?;
-        self.send_payload(UnknownByte::Zero, Command::Unknown7, &[0x38, 0xA8])?;
-        self.send_payload(UnknownByte::One, Command::Unknown7, &[0x38, 0xE0])?;
-        self.send_payload(UnknownByte::Zero, Command::Unknown7, &[0x38, 0x18, 0x01])?;
-        self.send_payload(UnknownByte::Zero, Command::Unknown7, &[0x2A, 0x50, 0x01])?;
-        self.send_payload(UnknownByte::Zero, Command::Unknown1B, &[0x38, 0x00])?;
-        self.send_payload(UnknownByte::Zero, Command::Unknown1B, &[0x38, 0x38])?;
-        self.send_payload(UnknownByte::Zero, Command::Unknown1B, &[0x0E, 0x70])?;
+        self.send_payload(0x0, Command::Unknown3, &[0x22])?;
+        self.send_payload(0x0, Command::Unknown7, &[0x38, 0x00])?;
+        self.send_payload(0x0, Command::Unknown7, &[0x38, 0x38])?;
+        self.send_payload(0x0, Command::Unknown7, &[0x38, 0x70])?;
+        self.send_payload(0x0, Command::Unknown7, &[0x38, 0xA8])?;
+        self.send_payload(0x1, Command::Unknown7, &[0x38, 0xE0])?;
+        self.send_payload(0x0, Command::Unknown7, &[0x38, 0x18, 0x01])?;
+        self.send_payload(0x0, Command::Unknown7, &[0x2A, 0x50, 0x01])?;
+        self.send_payload(0x0, Command::Unknown1B, &[0x38, 0x00])?;
+        self.send_payload(0x0, Command::Unknown1B, &[0x38, 0x38])?;
+        self.send_payload(0x0, Command::Unknown1B, &[0x0E, 0x70])?;
         self.end_transaction()?;
 
         Ok(())
@@ -255,10 +254,10 @@ impl CherryKeyboard {
 
         self.start_transaction()?;
         // Send main payload
-        self.send_payload(UnknownByte::One, Command::SetAnimation, &payload)?;
+        self.send_payload(0x1, Command::SetAnimation, &payload)?;
         // Send unknown / ?static? bytes
         self.send_payload(
-            UnknownByte::Zero,
+            0x0,
             Command::SetAnimation,
             &[0x01, 0x18, 0x00, 0x55, 0x01],
         )?;
@@ -279,7 +278,7 @@ impl CherryKeyboard {
         )?;
 
         for payload in key_leds.get_payloads()? {
-            self.send_payload(UnknownByte::Zero, Command::SetCustomLED, &payload.to_vec())?;
+            self.send_payload(0x0, Command::SetCustomLED, &payload.to_vec())?;
         }
 
         Ok(())
@@ -291,8 +290,8 @@ impl CherryKeyboard {
         self.set_custom_colors(CustomKeyLeds::new())?;
 
         // Payloads, type: 0x5
-        self.send_payload(UnknownByte::Zero, Command::Unknown5, &[0x01])?;
-        self.send_payload(UnknownByte::Zero, Command::Unknown5, &[0x19])?;
+        self.send_payload(0x0, Command::Unknown5, &[0x01])?;
+        self.send_payload(0x0, Command::Unknown5, &[0x19])?;
         Ok(())
     }
 }
@@ -453,16 +452,16 @@ mod tests {
     #[test]
     fn prep_packet() {
         assert_eq!(
-            prepare_packet(UnknownByte::Three, Command::TransactionStart, &[0x42, 0x94]).unwrap()
+            prepare_packet(0x3, Command::TransactionStart, &[0x42, 0x94]).unwrap()
                 [..6],
             vec![0x04, 0xD7, 0x03, 0x01, 0x42, 0x94]
         );
         assert_eq!(
-            prepare_packet(UnknownByte::One, Command::TransactionStart, &[0x47]).unwrap()[..5],
+            prepare_packet(0x1, Command::TransactionStart, &[0x47]).unwrap()[..5],
             vec![0x04, 0x48, 0x01, 0x01, 0x47]
         );
         assert_eq!(
-            prepare_packet(UnknownByte::Three, Command::SetAnimation, &[]).unwrap()[..4],
+            prepare_packet(0x3, Command::SetAnimation, &[]).unwrap()[..4],
             vec![0x04, 0x06, 0x03, 0x06]
         );
     }
