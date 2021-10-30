@@ -5,37 +5,14 @@ use crate::{
     extensions::{OwnRGB8, ToVec},
 };
 use anyhow::{anyhow, Result};
-use binrw::{binrw, BinWrite, BinWriterExt};
-
-/// Commands
-#[binrw]
-#[brw(repr = u8)]
-#[derive(Clone, Eq, PartialEq, Debug)]
-pub enum Command {
-    /// Start LED transaction
-    TransactionStart = 0x01,
-    /// End LED transaction
-    TransactionEnd = 0x02,
-    /// Unknown
-    Unknown3 = 0x03,
-    /// Unknown
-    Unknown5 = 0x05,
-    /// Set LED animation
-    SetAnimation = 0x06,
-    /// Unknown
-    Unknown7 = 0x07,
-    /// Set custom LED color per key
-    SetCustomLED = 0x0B,
-    /// Unknown
-    Unknown1B = 0x1B,
-}
+use binrw::{binrw, until_eof, BinRead, BinWrite, BinWriterExt};
 
 /// Modes support:
 /// -> C: Color
 /// -> S: Speed
 #[binrw]
 #[brw(repr = u8)]
-#[derive(Eq, PartialEq, Debug)]
+#[derive(Clone, Eq, PartialEq, Debug)]
 pub enum LightingMode {
     Wave = 0x00,      // CS
     Spectrum = 0x01,  // S
@@ -100,7 +77,7 @@ pub enum UsbPollingRate {
 /// LED animation speed
 #[binrw]
 #[brw(repr = u8)]
-#[derive(Eq, PartialEq, Debug)]
+#[derive(Clone, Eq, PartialEq, Debug)]
 pub enum Speed {
     VeryFast = 0,
     Fast = 1,
@@ -128,7 +105,7 @@ impl FromStr for Speed {
 /// LED brightness
 #[binrw]
 #[brw(repr = u8)]
-#[derive(Eq, PartialEq, Debug)]
+#[derive(Clone, Eq, PartialEq, Debug)]
 pub enum Brightness {
     Off = 0,
     Low = 1,
@@ -154,48 +131,117 @@ impl FromStr for Brightness {
     }
 }
 
+pub trait PayloadType {
+    fn payload_type(&self) -> u8;
+}
+
+/// Payloads
+#[binrw]
+#[br(import(payload_type: u8))]
+#[derive(Clone, Debug)]
+pub enum Payload {
+    #[br(pre_assert(payload_type == 0x1))]
+    TransactionStart,
+    #[br(pre_assert(payload_type == 0x2))]
+    TransactionEnd,
+    #[br(pre_assert(payload_type == 0x3))]
+    Unknown3 { unk: u8 },
+    #[br(pre_assert(payload_type == 0x5))]
+    Unknown5 { unk: u8 },
+    #[br(pre_assert(payload_type == 0x7))]
+    Unknown7 {
+        data_len: u8,
+        data_offset: u8,
+        secondary_keys: u8,
+    },
+    #[br(pre_assert(payload_type == 0x6))]
+    SetAnimation {
+        unknown: [u8; 5],
+        mode: LightingMode,
+        brightness: Brightness,
+        speed: Speed,
+        pad: u8,
+        rainbow: u8,
+        color: OwnRGB8,
+    },
+    #[br(pre_assert(payload_type == 0xB))]
+    SetCustomLED {
+        #[br(temp)]
+        #[bw(calc = key_leds_data.len() as u8)]
+        data_len: u8,
+        data_offset: u8,
+        secondary_keys: u8,
+        padding: u8,
+        #[br(count = data_len)]
+        key_leds_data: Vec<u8>,
+    },
+    #[br(pre_assert(payload_type == 0x1B))]
+    Unknown1B { data_len: u8, data_offset: u8 },
+    Unhandled {
+        #[br(parse_with = until_eof)]
+        data: Vec<u8>,
+    },
+}
+
+impl PayloadType for Payload {
+    fn payload_type(&self) -> u8 {
+        match self {
+            Payload::TransactionStart => 0x1,
+            Payload::TransactionEnd => 0x2,
+            Payload::Unknown3 { .. } => 0x3,
+            Payload::Unknown5 { .. } => 0x5,
+            Payload::Unknown7 { .. } => 0x7,
+            Payload::SetAnimation { .. } => 0x6,
+            Payload::SetCustomLED { .. } => 0xB,
+            Payload::Unknown1B { .. } => 0x1B,
+            _ => {
+                log::error!("Unhandled Payload: {:?}", self);
+                0xFF
+            }
+        }
+    }
+}
+
 /// Common packet structure
 #[binrw]
 #[brw(magic = 4u8)]
-#[derive(Debug)]
-pub struct Packet {
+#[derive(Clone, Debug)]
+pub struct Packet<T: BinRead<Args = (u8,)> + BinWrite<Args = ()> + PayloadType> {
     // magic, fixed to 0x04, see `br(magic = ...)`
     checksum: u8,
     unknown: u8,
-    command: Command,
-    data: [u8; 60],
+    #[br(temp)]
+    #[bw(calc = inner.payload_type())]
+    payload_type: u8,
+    #[br(args(payload_type))]
+    inner: T,
 }
 
-impl Packet {
-    pub fn new(unknown: u8, command: Command) -> Self {
+impl<T> Packet<T>
+where
+    T: BinRead<Args = (u8,)> + BinWrite<Args = ()> + PayloadType + Clone,
+{
+    pub fn new(unknown: u8, inner: T) -> Self {
+        let checksum = calc_checksum(inner.payload_type(), &inner.clone().to_vec());
+
         Self {
-            checksum: 0,
+            checksum,
             unknown,
-            command,
-            data: [0u8; 60],
+            inner,
         }
     }
 
-    /// Set payload
-    pub fn set_payload(&mut self, new_data: &[u8]) -> Result<()> {
-        if new_data.len() > 60 {
-            return Err(anyhow!("Payload exceeds 60 bytes"));
-        }
-
-        for (i, &byte) in new_data.iter().enumerate() {
-            self.data[i] = byte;
-        }
-        Ok(())
+    pub fn unknown(&self) -> u8 {
+        self.unknown
     }
 
-    /// Update checksum
-    pub fn update_checksum(&mut self) {
-        self.checksum = calc_checksum(self.command.clone(), &self.data);
+    pub fn payload(&self) -> &T {
+        &self.inner
     }
 
     /// Verify checksum
     pub fn verify_checksum(&self) -> Result<()> {
-        let calculated = calc_checksum(self.command.clone(), &self.data);
+        let calculated = calc_checksum(self.inner.payload_type(), &self.inner.clone().to_vec());
         if calculated == self.checksum {
             Ok(())
         } else {
@@ -206,62 +252,6 @@ impl Packet {
             ))
         }
     }
-}
-
-/// LED Animation payload
-/*
-              brightness  rainbow
-                   |         |   COLOR
-               mode|speed    |  R  G  B
-                |  |  |      |  |  |  |
-                v  v  v      v  v  v  v
-"09 00 00 55 00 12 03 03 00 00 7E 00 F4"
-*/
-#[binrw]
-#[derive(Debug)]
-pub struct LedAnimationPayload {
-    unknown: [u8; 5],
-    mode: LightingMode,
-    brightness: Brightness,
-    speed: Speed,
-    pad: u8,
-    rainbow: u8,
-    color: OwnRGB8,
-}
-
-impl LedAnimationPayload {
-    pub fn new(
-        mode: LightingMode,
-        brightness: Brightness,
-        speed: Speed,
-        color: OwnRGB8,
-        rainbow: bool,
-    ) -> Self {
-        let rainbow = if rainbow { 1 } else { 0 };
-        Self {
-            unknown: [0x09, 0x00, 0x00, 0x55, 0x00],
-            mode,
-            brightness,
-            speed,
-            pad: 0,
-            rainbow,
-            color,
-        }
-    }
-}
-
-/// Payload to set custom color per key
-#[binrw]
-#[derive(Debug)]
-pub struct LedCustomPayload {
-    #[br(temp)]
-    #[bw(calc = key_leds_data.len() as u8)]
-    data_len: u8,
-    data_offset: u8,
-    secondary_keys: u8,
-    padding: u8,
-    #[br(count = data_len)]
-    key_leds_data: Vec<u8>,
 }
 
 /// Wrapper around custom LED color for all keys
@@ -323,7 +313,7 @@ impl CustomKeyLeds {
     }
 
     /// Get array of payloads to be then provided to `send_payload`
-    pub fn get_payloads(self) -> Result<Vec<LedCustomPayload>> {
+    pub fn get_payloads(self) -> Result<Vec<Payload>> {
         let key_data = self.to_vec();
 
         let result = key_data
@@ -339,7 +329,7 @@ impl CustomKeyLeds {
                     are_secondary_keys = 0x01;
                 }
 
-                LedCustomPayload {
+                Payload::SetCustomLED {
                     data_offset: data_offset as u8,
                     secondary_keys: are_secondary_keys,
                     padding: 0x00,

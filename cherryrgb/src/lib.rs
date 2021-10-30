@@ -56,15 +56,15 @@ mod extensions;
 mod models;
 
 use anyhow::{anyhow, Context, Result};
+use binrw::{BinReaderExt};
+use rgb::RGB8;
 use rusb::UsbContext;
 use std::time::Duration;
 
 // Re-exports
 pub use extensions::{OwnRGB8, ToVec};
 pub use hex;
-pub use models::{
-    Brightness, Command, CustomKeyLeds, LedAnimationPayload, LightingMode, Packet, Speed,
-};
+pub use models::{Brightness, CustomKeyLeds, LightingMode, Packet, Payload, Speed};
 pub use rgb;
 pub use rusb;
 
@@ -78,21 +78,10 @@ const INTERRUPT_EP: u8 = 0x82;
 static TIMEOUT: Duration = Duration::from_millis(1000);
 
 /// Calculate packet checksum (index 1 in payload)
-fn calc_checksum(command: Command, data: &[u8]) -> u8 {
-    let sum = data.iter().map(|&i| i as u32).sum::<u32>() + (command as u32);
+fn calc_checksum(payload_type: u8, data: &[u8]) -> u8 {
+    let sum = data.iter().map(|&i| i as u32).sum::<u32>() + (payload_type as u32);
 
     (sum & 0xFF) as u8
-}
-
-// Prepend magic, checksum, unknown and command to payload
-fn prepare_packet(unknown: u8, command: Command, payload: &[u8]) -> Result<Vec<u8>> {
-    let mut packet = Packet::new(unknown, command);
-    // Append payload
-    packet.set_payload(payload)?;
-    // Set checksum
-    packet.update_checksum();
-
-    Ok(packet.to_vec())
 }
 
 /// Find supported Cherry USB keyboards and return collection of (vendor_id, product_id)
@@ -169,14 +158,12 @@ impl CherryKeyboard {
     }
 
     /// Writes a control packet first, then reads interrupt packet
-    fn send_payload(
-        &self,
-        unknown: u8,
-        command: Command,
-        payload: &[u8],
-    ) -> Result<Vec<u8>> {
-        // Prepend magic + checksum
-        let packet = prepare_packet(unknown, command, payload)?;
+    fn send_payload(&self, unknown: u8, payload: Payload) -> Result<Vec<u8>> {
+        let packet = Packet::new(unknown, payload.clone());
+
+        // Serialize and pad to 64 bytes
+        let mut packet_bytes = packet.clone().to_vec();
+        packet_bytes.resize(64, 0x00);
 
         let mut response = [0u8; 64];
         self.device_handle
@@ -189,11 +176,16 @@ impl CherryKeyboard {
                 0x09,    // Request - SET_REPORT
                 0x0204,  // Value - ReportId: 4, ReportType: Output
                 0x0001,  // Index
-                &packet, // Data
+                &packet_bytes, // Data
                 TIMEOUT,
             )
             .context("Control Write failure")?;
-        log::debug!("# >> CONTROL TRANSFER\n{:?}\n", hex::encode(&packet));
+
+        log::debug!(
+            ">> CONTROL TRANSFER {:?}\n>> {:?}\n",
+            hex::encode(&packet_bytes),
+            packet,
+        );
 
         self.device_handle
             .read_interrupt(
@@ -202,41 +194,116 @@ impl CherryKeyboard {
                 TIMEOUT,
             )
             .context("Interrupt read failure")?;
-        log::debug!("# << INTERRUPT TRANSFER\n{:?}\n", hex::encode(&response));
+
+        let detail_info = {
+            match std::io::Cursor::new(response.clone()).read_ne::<Packet<Payload>>() {
+                Ok(pkt) => format!("{:?} Checksum valid: {:?}", pkt, pkt.verify_checksum()),
+                Err(e) => format!("Failed to parse, err: {:?}", e),
+            }
+        };
+        log::debug!("<< INTERRUPT TRANSFER {:?}\n<< {}\n", hex::encode(&response), detail_info);
 
         Ok(response.to_vec())
     }
 
     /// Start RGB setting transaction
     fn start_transaction(&self) -> Result<()> {
-        self.send_payload(0x0, Command::TransactionStart, &[])?;
+        self.send_payload(0x0, Payload::TransactionStart)?;
 
         Ok(())
     }
 
     /// End RGB setting transaction
     fn end_transaction(&self) -> Result<()> {
-        self.send_payload(0x0, Command::TransactionEnd, &[])?;
+        self.send_payload(0x0, Payload::TransactionEnd)?;
 
         Ok(())
     }
 
     /// Just taken 1:1 from usb capture
     pub fn fetch_device_state(&self) -> Result<()> {
+        log::trace!("Fetching device state - START");
         self.start_transaction()?;
-        self.send_payload(0x0, Command::Unknown3, &[0x22])?;
-        self.send_payload(0x0, Command::Unknown7, &[0x38, 0x00])?;
-        self.send_payload(0x0, Command::Unknown7, &[0x38, 0x38])?;
-        self.send_payload(0x0, Command::Unknown7, &[0x38, 0x70])?;
-        self.send_payload(0x0, Command::Unknown7, &[0x38, 0xA8])?;
-        self.send_payload(0x1, Command::Unknown7, &[0x38, 0xE0])?;
-        self.send_payload(0x0, Command::Unknown7, &[0x38, 0x18, 0x01])?;
-        self.send_payload(0x0, Command::Unknown7, &[0x2A, 0x50, 0x01])?;
-        self.send_payload(0x0, Command::Unknown1B, &[0x38, 0x00])?;
-        self.send_payload(0x0, Command::Unknown1B, &[0x38, 0x38])?;
-        self.send_payload(0x0, Command::Unknown1B, &[0x0E, 0x70])?;
+        self.send_payload(0x0, Payload::Unknown3 { unk: 0x22 })?;
+        self.send_payload(
+            0x0,
+            Payload::Unknown7 {
+                data_len: 0x38,
+                data_offset: 0x00,
+                secondary_keys: 0x00,
+            },
+        )?;
+        self.send_payload(
+            0x0,
+            Payload::Unknown7 {
+                data_len: 0x38,
+                data_offset: 0x38,
+                secondary_keys: 0x00,
+            },
+        )?;
+        self.send_payload(
+            0x0,
+            Payload::Unknown7 {
+                data_len: 0x38,
+                data_offset: 0x70,
+                secondary_keys: 0x00,
+            },
+        )?;
+        self.send_payload(
+            0x0,
+            Payload::Unknown7 {
+                data_len: 0x38,
+                data_offset: 0xA8,
+                secondary_keys: 0x00,
+            },
+        )?;
+        self.send_payload(
+            0x1,
+            Payload::Unknown7 {
+                data_len: 0x38,
+                data_offset: 0xE0,
+                secondary_keys: 0x00,
+            },
+        )?;
+        self.send_payload(
+            0x0,
+            Payload::Unknown7 {
+                data_len: 0x38,
+                data_offset: 0x18,
+                secondary_keys: 0x01,
+            },
+        )?;
+        self.send_payload(
+            0x0,
+            Payload::Unknown7 {
+                data_len: 0x2A,
+                data_offset: 0x50,
+                secondary_keys: 0x01,
+            },
+        )?;
+        self.send_payload(
+            0x0,
+            Payload::Unknown1B {
+                data_len: 0x38,
+                data_offset: 0x00,
+            },
+        )?;
+        self.send_payload(
+            0x0,
+            Payload::Unknown1B {
+                data_len: 0x38,
+                data_offset: 0x38,
+            },
+        )?;
+        self.send_payload(
+            0x0,
+            Payload::Unknown1B {
+                data_len: 0x0E,
+                data_offset: 0x70,
+            },
+        )?;
         self.end_transaction()?;
-
+        log::trace!("Fetching device state - END");
         Ok(())
     }
 
@@ -249,25 +316,41 @@ impl CherryKeyboard {
         color: C,
         rainbow: bool,
     ) -> Result<()> {
-        let payload: Vec<u8> =
-            LedAnimationPayload::new(mode, brightness, speed, color.into(), rainbow).to_vec();
-
+        log::trace!("Set LED animation - START");
         self.start_transaction()?;
         // Send main payload
-        self.send_payload(0x1, Command::SetAnimation, &payload)?;
+        self.send_payload(0x1, Payload::SetAnimation {
+            unknown: [0x09, 0x00, 0x00, 0x55, 0x00],
+            mode,
+            brightness,
+            speed,
+            pad: 0x0,
+            rainbow: if rainbow { 1 } else { 0 },
+            color: color.into(),
+        })?;
         // Send unknown / ?static? bytes
         self.send_payload(
             0x0,
-            Command::SetAnimation,
-            &[0x01, 0x18, 0x00, 0x55, 0x01],
+            Payload::SetAnimation {
+                unknown: [0x01, 0x18, 0x00, 0x55, 0x01],
+                // Everything after unknown is nulled
+                mode: LightingMode::Wave,
+                brightness: Brightness::Off,
+                speed: Speed::VeryFast,
+                pad: 0x0,
+                rainbow: 0x0,
+                color: RGB8::new(0, 0, 0).into(),
+            },
         )?;
 
         self.end_transaction()?;
+        log::trace!("Set LED animation - END");
         Ok(())
     }
 
     /// Set custom color for each individual key
     pub fn set_custom_colors(&self, key_leds: CustomKeyLeds) -> Result<()> {
+        log::trace!("Set custom colors - START");
         // Set custom led mode
         self.set_led_animation(
             LightingMode::Custom,
@@ -278,26 +361,30 @@ impl CherryKeyboard {
         )?;
 
         for payload in key_leds.get_payloads()? {
-            self.send_payload(0x0, Command::SetCustomLED, &payload.to_vec())?;
+            self.send_payload(0x0, payload)?;
         }
-
+        log::trace!("Set custom colors - END");
         Ok(())
     }
 
     /// Reset custom key colors to default
     pub fn reset_custom_colors(&self) -> Result<()> {
+        log::trace!("Reset custom colors - START");
         // Create array of blank / off LEDs
         self.set_custom_colors(CustomKeyLeds::new())?;
 
         // Payloads, type: 0x5
-        self.send_payload(0x0, Command::Unknown5, &[0x01])?;
-        self.send_payload(0x0, Command::Unknown5, &[0x19])?;
+        self.send_payload(0x0, Payload::Unknown5 { unk: 0x01 })?;
+        self.send_payload(0x0, Payload::Unknown5 { unk: 0x19 })?;
+        log::trace!("Reset custom colors - END");
         Ok(())
     }
 }
 
 #[cfg(test)]
 mod tests {
+    use crate::models::PayloadType;
+
     use super::*;
     use binrw::BinReaderExt;
     use rgb::{ComponentSlice, RGB8};
@@ -364,8 +451,8 @@ mod tests {
 
             let expected_checksum = pkt[1];
             let mut cursor = Cursor::new(&pkt[3..]);
-            let command: Command = cursor.read_ne().expect("Failed to read command");
-            let calcd_checksum = calc_checksum(command, &pkt[4..]);
+            let payload_type: u8 = cursor.read_ne().expect("Failed to read command");
+            let calcd_checksum = calc_checksum(payload_type, &pkt[4..]);
 
             assert_eq!(
                 expected_checksum, calcd_checksum,
@@ -387,61 +474,71 @@ mod tests {
 
     #[test]
     fn serialize_led_animation_payload() {
-        let buf: Vec<u8> = LedAnimationPayload::new(
-            LightingMode::Vortex,
-            Brightness::Full,
-            Speed::VerySlow,
-            OwnRGB8::new(244, 255, 100),
-            false,
-        )
+        let buf: Vec<u8> = Payload::SetAnimation {
+            unknown: [0x09, 0x00, 0x00, 0x55, 0x00],
+            mode: LightingMode::Vortex,
+            brightness: Brightness::Full,
+            speed: Speed::VerySlow,
+            pad: 0x0,
+            rainbow: 0,
+            color: OwnRGB8::new(244, 255, 100),
+        }
         .to_vec();
         assert_eq!(
             vec![0x09, 0x00, 0x00, 0x55, 0x00, 0x05, 0x04, 0x04, 0x00, 0x00, 0xF4, 0xFF, 0x64],
             buf
         );
-        let buf: Vec<u8> = LedAnimationPayload::new(
-            LightingMode::Vortex,
-            Brightness::Full,
-            Speed::VerySlow,
-            OwnRGB8::new(244, 255, 100),
-            true,
-        )
+        let buf: Vec<u8> = Payload::SetAnimation {
+            unknown: [0x09, 0x00, 0x00, 0x55, 0x00],
+            mode: LightingMode::Vortex,
+            brightness: Brightness::Full,
+            speed: Speed::VerySlow,
+            pad: 0x0,
+            rainbow: 1,
+            color: OwnRGB8::new(244, 255, 100),
+        }
         .to_vec();
         assert_eq!(
             vec![0x09, 0x00, 0x00, 0x55, 0x00, 0x05, 0x04, 0x04, 0x00, 0x01, 0xF4, 0xFF, 0x64],
             buf
         );
-        let buf: Vec<u8> = LedAnimationPayload::new(
-            LightingMode::Rolling,
-            Brightness::Full,
-            Speed::VerySlow,
-            OwnRGB8::new(244, 255, 100),
-            false,
-        )
+        let buf: Vec<u8> = Payload::SetAnimation {
+            unknown: [0x09, 0x00, 0x00, 0x55, 0x00],
+            mode: LightingMode::Rolling,
+            brightness: Brightness::Full,
+            speed: Speed::VerySlow,
+            pad: 0x0,
+            rainbow: 0,
+            color: OwnRGB8::new(244, 255, 100),
+        }
         .to_vec();
         assert_eq!(
             vec![0x09, 0x00, 0x00, 0x55, 0x00, 0x0A, 0x04, 0x04, 0x00, 0x00, 0xF4, 0xFF, 0x64],
             buf
         );
-        let buf: Vec<u8> = LedAnimationPayload::new(
-            LightingMode::Vortex,
-            Brightness::Full,
-            Speed::Medium,
-            OwnRGB8::new(244, 255, 100),
-            false,
-        )
+        let buf: Vec<u8> = Payload::SetAnimation {
+            unknown: [0x09, 0x00, 0x00, 0x55, 0x00],
+            mode: LightingMode::Vortex,
+            brightness: Brightness::Full,
+            speed: Speed::Medium,
+            pad: 0x0,
+            rainbow: 0,
+            color: OwnRGB8::new(244, 255, 100),
+        }
         .to_vec();
         assert_eq!(
             vec![0x09, 0x00, 0x00, 0x55, 0x00, 0x05, 0x04, 0x02, 0x00, 0x00, 0xF4, 0xFF, 0x64],
             buf
         );
-        let buf: Vec<u8> = LedAnimationPayload::new(
-            LightingMode::Vortex,
-            Brightness::Low,
-            Speed::Medium,
-            OwnRGB8::new(244, 255, 100),
-            false,
-        )
+        let buf: Vec<u8> = Payload::SetAnimation {
+            unknown: [0x09, 0x00, 0x00, 0x55, 0x00],
+            mode: LightingMode::Vortex,
+            brightness: Brightness::Low,
+            speed: Speed::Medium,
+            pad: 0x0,
+            rainbow: 0,
+            color: OwnRGB8::new(244, 255, 100),
+        }
         .to_vec();
         assert_eq!(
             vec![0x09, 0x00, 0x00, 0x55, 0x00, 0x05, 0x01, 0x02, 0x00, 0x00, 0xF4, 0xFF, 0x64],
@@ -451,18 +548,47 @@ mod tests {
 
     #[test]
     fn prep_packet() {
+        let packet = Packet::new(0x3, Payload::TransactionStart).to_vec();
+        assert_eq!(packet[..4], vec![0x04, 0x01, 0x03, 0x01]);
+
+        let packet = 
+            Packet::new(0x3,
+            Payload::SetAnimation {
+                unknown: [0x01, 0x18, 0x00, 0x55, 0x01],
+                // Everything after unknown is nulled
+                mode: LightingMode::Wave,
+                brightness: Brightness::Off,
+                speed: Speed::VeryFast,
+                pad: 0x0,
+                rainbow: 0x0,
+                color: RGB8::new(0, 0, 0x42).into(),
+            }).to_vec();
+
         assert_eq!(
-            prepare_packet(0x3, Command::TransactionStart, &[0x42, 0x94]).unwrap()
-                [..6],
-            vec![0x04, 0xD7, 0x03, 0x01, 0x42, 0x94]
+            packet[..17],
+            vec![
+                0x04, 0xB7, 0x03, 0x06, 0x01, 0x18, 0x00, 0x55, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00,
+                0x00, 0x00, 0x42
+            ]
         );
-        assert_eq!(
-            prepare_packet(0x1, Command::TransactionStart, &[0x47]).unwrap()[..5],
-            vec![0x04, 0x48, 0x01, 0x01, 0x47]
-        );
-        assert_eq!(
-            prepare_packet(0x3, Command::SetAnimation, &[]).unwrap()[..4],
-            vec![0x04, 0x06, 0x03, 0x06]
-        );
+    }
+
+    #[test]
+    fn unhandled_packet() {
+        let packet = b"\x04\xEE\x01\x42\x09\x00\x00\x55\x00\x12\x03\x03\x00\x00\x7E\x00\xF4";
+        let mut reader = Cursor::new(packet);
+        let deserialized: Packet<Payload> = reader.read_ne().expect("Failed reading unhandled packet");
+
+        assert_eq!(deserialized.unknown(), 0x01);
+        // Unknown payload types get mapped to 0xFF
+        assert_eq!(deserialized.payload().payload_type(), 0xFF);
+        match deserialized.payload() {
+            Payload::Unhandled {data} => {
+                assert_eq!(data[..], b"\x09\x00\x00\x55\x00\x12\x03\x03\x00\x00\x7E\x00\xF4"[..]);
+            },
+            _ => {
+                assert_eq!(1, 2)
+            }
+        }
     }
 }
