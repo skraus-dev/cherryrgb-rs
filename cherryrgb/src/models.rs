@@ -151,8 +151,7 @@ pub enum Payload {
     #[br(pre_assert(payload_type == 0x7))]
     Unknown7 {
         data_len: u8,
-        data_offset: u8,
-        secondary_keys: u8,
+        data_offset: u16,
     },
     #[br(pre_assert(payload_type == 0x6))]
     SetAnimation {
@@ -169,8 +168,7 @@ pub enum Payload {
         #[br(temp)]
         #[bw(calc = key_leds_data.len() as u8)]
         data_len: u8,
-        data_offset: u8,
-        secondary_keys: u8,
+        data_offset: u16,
         padding: u8,
         #[br(count = data_len)]
         key_leds_data: Vec<u8>,
@@ -208,8 +206,7 @@ impl PayloadType for Payload {
 #[derive(Clone, Debug)]
 pub struct Packet<T: BinRead<Args = (u8,)> + BinWrite<Args = ()> + PayloadType> {
     // magic, fixed to 0x04, see `br(magic = ...)`
-    checksum: u8,
-    unknown: u8,
+    checksum: u16,
     #[br(temp)]
     #[bw(calc = inner.payload_type())]
     payload_type: u8,
@@ -221,18 +218,17 @@ impl<T> Packet<T>
 where
     T: BinRead<Args = (u8,)> + BinWrite<Args = ()> + PayloadType + Clone,
 {
-    pub fn new(unknown: u8, inner: T) -> Self {
+    pub fn new(inner: T) -> Self {
         let checksum = calc_checksum(inner.payload_type(), &inner.clone().to_vec());
 
         Self {
             checksum,
-            unknown,
             inner,
         }
     }
 
-    pub fn unknown(&self) -> u8 {
-        self.unknown
+    pub fn checksum(&self) -> u16 {
+        self.checksum
     }
 
     pub fn payload(&self) -> &T {
@@ -321,17 +317,10 @@ impl CustomKeyLeds {
             .into_iter()
             .enumerate()
             .map(|(index, chunk)| {
-                let mut are_secondary_keys = 0x00;
-                let mut data_offset = index * CustomKeyLeds::CHUNK_SIZE;
-
-                if data_offset > 0xFF {
-                    data_offset %= 0x100;
-                    are_secondary_keys = 0x01;
-                }
+                let data_offset = index * CustomKeyLeds::CHUNK_SIZE;
 
                 Payload::SetCustomLED {
-                    data_offset: data_offset as u8,
-                    secondary_keys: are_secondary_keys,
+                    data_offset: data_offset as u16,
                     padding: 0x00,
                     key_leds_data: chunk.to_vec(),
                 }
