@@ -78,10 +78,10 @@ const INTERRUPT_EP: u8 = 0x82;
 static TIMEOUT: Duration = Duration::from_millis(1000);
 
 /// Calculate packet checksum (index 1 in payload)
-fn calc_checksum(payload_type: u8, data: &[u8]) -> u8 {
+fn calc_checksum(payload_type: u8, data: &[u8]) -> u16 {
     let sum = data.iter().map(|&i| i as u32).sum::<u32>() + (payload_type as u32);
 
-    (sum & 0xFF) as u8
+    sum as u16
 }
 
 /// Find supported Cherry USB keyboards and return collection of (vendor_id, product_id)
@@ -158,8 +158,8 @@ impl CherryKeyboard {
     }
 
     /// Writes a control packet first, then reads interrupt packet
-    fn send_payload(&self, unknown: u8, payload: Payload) -> Result<Vec<u8>> {
-        let packet = Packet::new(unknown, payload);
+    fn send_payload(&self, payload: Payload) -> Result<Vec<u8>> {
+        let packet = Packet::new(payload);
 
         // Serialize and pad to 64 bytes
         let mut packet_bytes = packet.clone().to_vec();
@@ -212,14 +212,14 @@ impl CherryKeyboard {
 
     /// Start RGB setting transaction
     fn start_transaction(&self) -> Result<()> {
-        self.send_payload(0x0, Payload::TransactionStart)?;
+        self.send_payload( Payload::TransactionStart)?;
 
         Ok(())
     }
 
     /// End RGB setting transaction
     fn end_transaction(&self) -> Result<()> {
-        self.send_payload(0x0, Payload::TransactionEnd)?;
+        self.send_payload(Payload::TransactionEnd)?;
 
         Ok(())
     }
@@ -228,79 +228,62 @@ impl CherryKeyboard {
     pub fn fetch_device_state(&self) -> Result<()> {
         log::trace!("Fetching device state - START");
         self.start_transaction()?;
-        self.send_payload(0x0, Payload::Unknown3 { unk: 0x22 })?;
+        self.send_payload(Payload::Unknown3 { unk: 0x22 })?;
         self.send_payload(
-            0x0,
             Payload::Unknown7 {
                 data_len: 0x38,
                 data_offset: 0x00,
-                secondary_keys: 0x00,
             },
         )?;
         self.send_payload(
-            0x0,
             Payload::Unknown7 {
                 data_len: 0x38,
                 data_offset: 0x38,
-                secondary_keys: 0x00,
             },
         )?;
         self.send_payload(
-            0x0,
             Payload::Unknown7 {
                 data_len: 0x38,
                 data_offset: 0x70,
-                secondary_keys: 0x00,
             },
         )?;
         self.send_payload(
-            0x0,
             Payload::Unknown7 {
                 data_len: 0x38,
                 data_offset: 0xA8,
-                secondary_keys: 0x00,
             },
         )?;
         self.send_payload(
-            0x1,
             Payload::Unknown7 {
                 data_len: 0x38,
                 data_offset: 0xE0,
-                secondary_keys: 0x00,
             },
         )?;
         self.send_payload(
-            0x0,
             Payload::Unknown7 {
                 data_len: 0x38,
-                data_offset: 0x18,
-                secondary_keys: 0x01,
+                data_offset: 0x118,
             },
         )?;
         self.send_payload(
-            0x0,
             Payload::Unknown7 {
                 data_len: 0x2A,
-                data_offset: 0x50,
-                secondary_keys: 0x01,
+                data_offset: 0x150,
             },
         )?;
         self.send_payload(
-            0x0,
             Payload::Unknown1B {
                 data_len: 0x38,
                 data_offset: 0x00,
             },
         )?;
         self.send_payload(
-            0x0,
             Payload::Unknown1B {
                 data_len: 0x38,
                 data_offset: 0x38,
             },
         )?;
         self.send_payload(
-            0x0,
             Payload::Unknown1B {
                 data_len: 0x0E,
                 data_offset: 0x70,
@@ -324,7 +307,6 @@ impl CherryKeyboard {
         self.start_transaction()?;
         // Send main payload
         self.send_payload(
-            0x1,
             Payload::SetAnimation {
                 unknown: [0x09, 0x00, 0x00, 0x55, 0x00],
                 mode,
@@ -337,7 +319,6 @@ impl CherryKeyboard {
         )?;
         // Send unknown / ?static? bytes
         self.send_payload(
-            0x0,
             Payload::SetAnimation {
                 unknown: [0x01, 0x18, 0x00, 0x55, 0x01],
                 // Everything after unknown is nulled
@@ -368,7 +349,7 @@ impl CherryKeyboard {
         )?;
 
         for payload in key_leds.get_payloads()? {
-            self.send_payload(0x0, payload)?;
+            self.send_payload(payload)?;
         }
         log::trace!("Set custom colors - END");
         Ok(())
@@ -381,8 +362,8 @@ impl CherryKeyboard {
         self.set_custom_colors(CustomKeyLeds::new())?;
 
         // Payloads, type: 0x5
-        self.send_payload(0x0, Payload::Unknown5 { unk: 0x01 })?;
-        self.send_payload(0x0, Payload::Unknown5 { unk: 0x19 })?;
+        self.send_payload(Payload::Unknown5 { unk: 0x01 })?;
+        self.send_payload(Payload::Unknown5 { unk: 0x19 })?;
         log::trace!("Reset custom colors - END");
         Ok(())
     }
@@ -399,10 +380,10 @@ mod tests {
 
     /// Some captures packets
     fn packets() -> Vec<&'static str> {
-        //                              brightness
+        //                             brightness
         //     checksum                mode|speed      color
-        //      |                       |  |  |         |
-        //      v                       v  v  v         v
+        //        |                     |  |  |         |
+        //       vvv                    v  v  v         v
         vec![
             "04 69 01 06 09 00 00 55 00 00 03 02 00 01 FF", //       00 - wave - regular
             "04 6B 01 06 09 00 00 55 00 00 03 04 00 01 FF", //       01 - wave - slow
@@ -456,8 +437,8 @@ mod tests {
             let pkt =
                 hex::decode(pkt_str.replace(" ", "")).expect("Failed to convert pkt hexstream");
 
-            let expected_checksum = pkt[1];
-            let mut cursor = Cursor::new(&pkt[3..]);
+            let mut cursor = Cursor::new(&pkt[1..]);
+            let expected_checksum: u16 = cursor.read_ne().expect("Failed to read checksum");
             let payload_type: u8 = cursor.read_ne().expect("Failed to read command");
             let calcd_checksum = calc_checksum(payload_type, &pkt[4..]);
 
@@ -555,11 +536,10 @@ mod tests {
 
     #[test]
     fn prep_packet() {
-        let packet = Packet::new(0x3, Payload::TransactionStart).to_vec();
-        assert_eq!(packet[..4], vec![0x04, 0x01, 0x03, 0x01]);
+        let packet = Packet::new( Payload::TransactionStart).to_vec();
+        assert_eq!(packet[..4], vec![0x04, 0x01, 0x00, 0x01]);
 
         let packet = Packet::new(
-            0x3,
             Payload::SetAnimation {
                 unknown: [0x01, 0x18, 0x00, 0x55, 0x01],
                 // Everything after unknown is nulled
@@ -576,7 +556,7 @@ mod tests {
         assert_eq!(
             packet[..17],
             vec![
-                0x04, 0xB7, 0x03, 0x06, 0x01, 0x18, 0x00, 0x55, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00,
+                0x04, 0xB7, 0x00, 0x06, 0x01, 0x18, 0x00, 0x55, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00,
                 0x00, 0x00, 0x42
             ]
         );
@@ -589,7 +569,7 @@ mod tests {
         let deserialized: Packet<Payload> =
             reader.read_ne().expect("Failed reading unhandled packet");
 
-        assert_eq!(deserialized.unknown(), 0x01);
+        assert_eq!(deserialized.checksum(), 0x1EE);
         // Unknown payload types get mapped to 0xFF
         assert_eq!(deserialized.payload().payload_type(), 0xFF);
         match deserialized.payload() {
