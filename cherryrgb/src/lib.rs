@@ -212,7 +212,7 @@ impl CherryKeyboard {
 
     /// Start RGB setting transaction
     fn start_transaction(&self) -> Result<()> {
-        self.send_payload( Payload::TransactionStart)?;
+        self.send_payload(Payload::TransactionStart)?;
 
         Ok(())
     }
@@ -229,66 +229,46 @@ impl CherryKeyboard {
         log::trace!("Fetching device state - START");
         self.start_transaction()?;
         self.send_payload(Payload::Unknown3 { unk: 0x22 })?;
-        self.send_payload(
-            Payload::Unknown7 {
-                data_len: 0x38,
-                data_offset: 0x00,
-            },
-        )?;
-        self.send_payload(
-            Payload::Unknown7 {
-                data_len: 0x38,
-                data_offset: 0x38,
-            },
-        )?;
-        self.send_payload(
-            Payload::Unknown7 {
-                data_len: 0x38,
-                data_offset: 0x70,
-            },
-        )?;
-        self.send_payload(
-            Payload::Unknown7 {
-                data_len: 0x38,
-                data_offset: 0xA8,
-            },
-        )?;
-        self.send_payload(
-            Payload::Unknown7 {
-                data_len: 0x38,
-                data_offset: 0xE0,
-            },
-        )?;
-        self.send_payload(
-            Payload::Unknown7 {
-                data_len: 0x38,
-                data_offset: 0x118,
-            },
-        )?;
-        self.send_payload(
-            Payload::Unknown7 {
-                data_len: 0x2A,
-                data_offset: 0x150,
-            },
-        )?;
-        self.send_payload(
-            Payload::Unknown1B {
-                data_len: 0x38,
-                data_offset: 0x00,
-            },
-        )?;
-        self.send_payload(
-            Payload::Unknown1B {
-                data_len: 0x38,
-                data_offset: 0x38,
-            },
-        )?;
-        self.send_payload(
-            Payload::Unknown1B {
-                data_len: 0x0E,
-                data_offset: 0x70,
-            },
-        )?;
+        self.send_payload(Payload::Unknown7 {
+            data_len: 0x38,
+            data_offset: 0x00,
+        })?;
+        self.send_payload(Payload::Unknown7 {
+            data_len: 0x38,
+            data_offset: 0x38,
+        })?;
+        self.send_payload(Payload::Unknown7 {
+            data_len: 0x38,
+            data_offset: 0x70,
+        })?;
+        self.send_payload(Payload::Unknown7 {
+            data_len: 0x38,
+            data_offset: 0xA8,
+        })?;
+        self.send_payload(Payload::Unknown7 {
+            data_len: 0x38,
+            data_offset: 0xE0,
+        })?;
+        self.send_payload(Payload::Unknown7 {
+            data_len: 0x38,
+            data_offset: 0x118,
+        })?;
+        self.send_payload(Payload::Unknown7 {
+            data_len: 0x2A,
+            data_offset: 0x150,
+        })?;
+        self.send_payload(Payload::Unknown1B {
+            data_len: 0x38,
+            data_offset: 0x00,
+        })?;
+        self.send_payload(Payload::Unknown1B {
+            data_len: 0x38,
+            data_offset: 0x38,
+        })?;
+        self.send_payload(Payload::Unknown1B {
+            data_len: 0x0E,
+            data_offset: 0x70,
+        })?;
         self.end_transaction()?;
         log::trace!("Fetching device state - END");
         Ok(())
@@ -306,30 +286,26 @@ impl CherryKeyboard {
         log::trace!("Set LED animation - START");
         self.start_transaction()?;
         // Send main payload
-        self.send_payload(
-            Payload::SetAnimation {
-                unknown: [0x09, 0x00, 0x00, 0x55, 0x00],
-                mode,
-                brightness,
-                speed,
-                pad: 0x0,
-                rainbow: if rainbow { 1 } else { 0 },
-                color: color.into(),
-            },
-        )?;
+        self.send_payload(Payload::SetAnimation {
+            unknown: [0x09, 0x00, 0x00, 0x55, 0x00],
+            mode,
+            brightness,
+            speed,
+            pad: 0x0,
+            rainbow: if rainbow { 1 } else { 0 },
+            color: color.into(),
+        })?;
         // Send unknown / ?static? bytes
-        self.send_payload(
-            Payload::SetAnimation {
-                unknown: [0x01, 0x18, 0x00, 0x55, 0x01],
-                // Everything after unknown is nulled
-                mode: LightingMode::Wave,
-                brightness: Brightness::Off,
-                speed: Speed::VeryFast,
-                pad: 0x0,
-                rainbow: 0x0,
-                color: RGB8::new(0, 0, 0).into(),
-            },
-        )?;
+        self.send_payload(Payload::SetAnimation {
+            unknown: [0x01, 0x18, 0x00, 0x55, 0x01],
+            // Everything after unknown is nulled
+            mode: LightingMode::Wave,
+            brightness: Brightness::Off,
+            speed: Speed::VeryFast,
+            pad: 0x0,
+            rainbow: 0x0,
+            color: RGB8::new(0, 0, 0).into(),
+        })?;
 
         self.end_transaction()?;
         log::trace!("Set LED animation - END");
@@ -536,21 +512,19 @@ mod tests {
 
     #[test]
     fn prep_packet() {
-        let packet = Packet::new( Payload::TransactionStart).to_vec();
+        let packet = Packet::new(Payload::TransactionStart).to_vec();
         assert_eq!(packet[..4], vec![0x04, 0x01, 0x00, 0x01]);
 
-        let packet = Packet::new(
-            Payload::SetAnimation {
-                unknown: [0x01, 0x18, 0x00, 0x55, 0x01],
-                // Everything after unknown is nulled
-                mode: LightingMode::Wave,
-                brightness: Brightness::Off,
-                speed: Speed::VeryFast,
-                pad: 0x0,
-                rainbow: 0x0,
-                color: RGB8::new(0, 0, 0x42).into(),
-            },
-        )
+        let packet = Packet::new(Payload::SetAnimation {
+            unknown: [0x01, 0x18, 0x00, 0x55, 0x01],
+            // Everything after unknown is nulled
+            mode: LightingMode::Wave,
+            brightness: Brightness::Off,
+            speed: Speed::VeryFast,
+            pad: 0x0,
+            rainbow: 0x0,
+            color: RGB8::new(0, 0, 0x42).into(),
+        })
         .to_vec();
 
         assert_eq!(

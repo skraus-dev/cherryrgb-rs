@@ -149,10 +149,7 @@ pub enum Payload {
     #[br(pre_assert(payload_type == 0x5))]
     Unknown5 { unk: u8 },
     #[br(pre_assert(payload_type == 0x7))]
-    Unknown7 {
-        data_len: u8,
-        data_offset: u16,
-    },
+    Unknown7 { data_len: u8, data_offset: u16 },
     #[br(pre_assert(payload_type == 0x6))]
     SetAnimation {
         unknown: [u8; 5],
@@ -221,10 +218,7 @@ where
     pub fn new(inner: T) -> Self {
         let checksum = calc_checksum(inner.payload_type(), &inner.clone().to_vec());
 
-        Self {
-            checksum,
-            inner,
-        }
+        Self { checksum, inner }
     }
 
     pub fn checksum(&self) -> u16 {
