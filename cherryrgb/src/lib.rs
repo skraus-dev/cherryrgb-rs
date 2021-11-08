@@ -79,9 +79,9 @@ static TIMEOUT: Duration = Duration::from_millis(1000);
 
 /// Calculate packet checksum (index 1 in payload)
 fn calc_checksum(payload_type: u8, data: &[u8]) -> u16 {
-    let sum = data.iter().map(|&i| i as u32).sum::<u32>() + (payload_type as u32);
+    let sum = data.iter().map(|&i| i as u16).sum::<u16>() + (payload_type as u16);
 
-    sum as u16
+    sum
 }
 
 /// Find supported Cherry USB keyboards and return collection of (vendor_id, product_id)
