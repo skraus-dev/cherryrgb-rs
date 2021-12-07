@@ -48,6 +48,22 @@ Set custom key colors
 ./cherryrgb_cli -b full custom-colors ff00ff 0000ff
 ```
 
+## Build from source
+
+### Dependencies
+
+- Rust (https://www.rust-lang.org/tools/install)
+
+### Clone & Build
+
+```bash
+git clone https://github.com/skraus-dev/cherryrgb-rs.git
+cd cherryrgb-rs
+cargo build
+```
+
+Now you can run the binary from `./target/debug/cherryrgb_cli`
+
 ## Disclaimer
 
 Use at your own risk.
