@@ -140,14 +140,17 @@ impl CherryKeyboard {
         assert_eq!(device_desc.num_configurations(), 1);
         assert_eq!(config_desc.num_interfaces(), 2);
 
-        let kernel_driver_active = device_handle
-            .kernel_driver_active(INTERFACE_NUM)
-            .context("kernel_driver_active")?;
+        // Skip kernel driver detachment for non-unix platforms
+        if cfg!(unix) {
+            let kernel_driver_active = device_handle
+                .kernel_driver_active(INTERFACE_NUM)
+                .context("kernel_driver_active")?;
 
-        if kernel_driver_active {
-            device_handle
-                .detach_kernel_driver(INTERFACE_NUM)
-                .context("Failed to detach active kernel driver")?;
+            if kernel_driver_active {
+                device_handle
+                    .detach_kernel_driver(INTERFACE_NUM)
+                    .context("Failed to detach active kernel driver")?;
+            }
         }
 
         device_handle
