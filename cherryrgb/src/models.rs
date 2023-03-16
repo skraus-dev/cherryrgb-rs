@@ -62,6 +62,12 @@ impl FromStr for LightingMode {
     }
 }
 
+pub const HELP_LIGHTING_MODE: &'static [&str]  = &[
+    "wave", "spectrum", "breathing", "static", "vortex",
+    "fire", "stars", "rain", "custom", "rolling", "curve",
+    "wave_mid", "scan", "radiation", "ripples", "single_key"
+];
+
 /// Probably controlled at OS / driver level
 /// Just defined here for completeness' sake
 #[binrw]
@@ -102,6 +108,10 @@ impl FromStr for Speed {
     }
 }
 
+pub const HELP_SPEED: &'static [&str] = &[
+    "very_slow", "slow", "medium", "fast", "very_fast"
+];
+
 /// LED brightness
 #[binrw]
 #[brw(repr = u8)]
@@ -130,6 +140,10 @@ impl FromStr for Brightness {
         Ok(brightness)
     }
 }
+
+pub const HELP_BRIGHTNESS: &'static [&str]  = &[
+    "off", "low", "medium", "high", "full"
+];
 
 pub trait PayloadType {
     fn payload_type(&self) -> u8;

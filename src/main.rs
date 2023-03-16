@@ -6,10 +6,12 @@ use structopt::StructOpt;
 
 #[derive(StructOpt, Debug)]
 struct AnimationArgs {
-    /// Set LED mode (range 0-15)
+    #[structopt(possible_values = cherryrgb::HELP_LIGHTING_MODE)]
+    /// Set LED mode
     mode: LightingMode,
 
-    /// Set speed (range 0-4)
+    #[structopt(possible_values = cherryrgb::HELP_SPEED)]
+    /// Set speed
     speed: Speed,
 
     /// Color (e.g ff00ff)
@@ -45,8 +47,8 @@ struct Opt {
     #[structopt(subcommand)]
     command: CliCommand,
 
-    /// Set brightness (range 0-4)
-    #[structopt(short, long, default_value = "full")]
+    /// Set brightness
+    #[structopt(short, long, default_value = "full", possible_values = cherryrgb::HELP_BRIGHTNESS)]
     brightness: Brightness,
 }
 
