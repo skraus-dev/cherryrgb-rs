@@ -1,18 +1,18 @@
-use std::str::FromStr;
-
 use crate::{
     calc_checksum,
     extensions::{OwnRGB8, ToVec},
 };
 use anyhow::{anyhow, Result};
 use binrw::{binrw, until_eof, BinRead, BinWrite, BinWriterExt};
+use strum_macros::{EnumString, EnumVariantNames};
 
 /// Modes support:
 /// -> C: Color
 /// -> S: Speed
 #[binrw]
 #[brw(repr = u8)]
-#[derive(Clone, Eq, PartialEq, Debug)]
+#[derive(Clone, Eq, PartialEq, Debug, EnumString, EnumVariantNames)]
+#[strum(serialize_all = "snake_case")]
 pub enum LightingMode {
     Wave = 0x00,      // CS
     Spectrum = 0x01,  // S
@@ -33,35 +33,6 @@ pub enum LightingMode {
     SingleKey = 0x15, // CS
 }
 
-impl FromStr for LightingMode {
-    type Err = anyhow::Error;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let mode = match s {
-            "wave" => LightingMode::Wave,
-            "spectrum" => LightingMode::Spectrum,
-            "breathing" => LightingMode::Breathing,
-            "static" => LightingMode::Static,
-            "radar" => LightingMode::Radar,
-            "vortex" => LightingMode::Vortex,
-            "fire" => LightingMode::Fire,
-            "stars" => LightingMode::Stars,
-            "rain" => LightingMode::Rain,
-            "custom" => LightingMode::Custom,
-            "rolling" => LightingMode::Rolling,
-            "curve" => LightingMode::Curve,
-            "wave_mid" => LightingMode::WaveMid,
-            "scan" => LightingMode::Scan,
-            "radiation" => LightingMode::Radiation,
-            "ripples" => LightingMode::Ripples,
-            "single_key" => LightingMode::SingleKey,
-            _ => return Err(anyhow!("Invalid mode supplied: {:?}", s)),
-        };
-
-        Ok(mode)
-    }
-}
-
 /// Probably controlled at OS / driver level
 /// Just defined here for completeness' sake
 #[binrw]
@@ -77,7 +48,8 @@ pub enum UsbPollingRate {
 /// LED animation speed
 #[binrw]
 #[brw(repr = u8)]
-#[derive(Clone, Eq, PartialEq, Debug)]
+#[derive(Clone, Eq, PartialEq, Debug, EnumString, EnumVariantNames)]
+#[strum(serialize_all = "snake_case")]
 pub enum Speed {
     VeryFast = 0,
     Fast = 1,
@@ -86,49 +58,17 @@ pub enum Speed {
     VerySlow = 4,
 }
 
-impl FromStr for Speed {
-    type Err = anyhow::Error;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let speed = match s {
-            "very_slow" => Speed::VerySlow,
-            "slow" => Speed::Slow,
-            "medium" => Speed::Medium,
-            "fast" => Speed::Fast,
-            "very_fast" => Speed::VeryFast,
-            _ => return Err(anyhow!("Invalid mode supplied: {:?}", s)),
-        };
-        Ok(speed)
-    }
-}
-
 /// LED brightness
 #[binrw]
 #[brw(repr = u8)]
-#[derive(Clone, Eq, PartialEq, Debug)]
+#[derive(Clone, Eq, PartialEq, Debug, EnumString, EnumVariantNames)]
+#[strum(serialize_all = "snake_case")]
 pub enum Brightness {
     Off = 0,
     Low = 1,
     Medium = 2,
     High = 3,
     Full = 4,
-}
-
-impl FromStr for Brightness {
-    type Err = anyhow::Error;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let brightness = match s {
-            "off" => Brightness::Off,
-            "low" => Brightness::Low,
-            "medium" => Brightness::Medium,
-            "high" => Brightness::High,
-            "full" => Brightness::Full,
-            _ => return Err(anyhow!("Invalid mode supplied: {:?}", s)),
-        };
-
-        Ok(brightness)
-    }
 }
 
 pub trait PayloadType {

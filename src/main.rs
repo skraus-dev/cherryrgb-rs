@@ -3,13 +3,16 @@ use cherryrgb::{
     self, rgb, Brightness, CherryKeyboard, CustomKeyLeds, LightingMode, OwnRGB8, Speed,
 };
 use structopt::StructOpt;
+use strum::VariantNames;
 
 #[derive(StructOpt, Debug)]
 struct AnimationArgs {
-    /// Set LED mode (range 0-15)
+    /// Set LED mode
+    #[structopt(possible_values = LightingMode::VARIANTS)]
     mode: LightingMode,
 
-    /// Set speed (range 0-4)
+    /// Set speed
+    #[structopt(possible_values = Speed::VARIANTS)]
     speed: Speed,
 
     /// Color (e.g ff00ff)
@@ -45,8 +48,8 @@ struct Opt {
     #[structopt(subcommand)]
     command: CliCommand,
 
-    /// Set brightness (range 0-4)
-    #[structopt(short, long, default_value = "full")]
+    /// Set brightness
+    #[structopt(short, long, default_value = "full", possible_values = Brightness::VARIANTS)]
     brightness: Brightness,
 }
 
