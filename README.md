@@ -7,6 +7,7 @@
 
 Tested with
 * Cherry Keyboard G80-3000N RGB (046a:00dd)
+* Cherry Keyboard MX10.0N       (046a:00df)
 
 ## Features
 

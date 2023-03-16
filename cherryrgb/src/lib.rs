@@ -73,6 +73,8 @@ pub use rusb;
 pub const CHERRY_USB_VID: u16 = 0x046a;
 /// USB Product ID - G80-3000N RGB TKL Keyboard
 pub const G80_3000N_RGB_TKL_USB_PID: u16 = 0x00dd;
+/// USB Product ID - MX 10.0N Keyboard
+pub const MX10N_USB_PID: u16 = 0x00df;
 const INTERFACE_NUM: u8 = 1;
 const INTERRUPT_EP: u8 = 0x82;
 static TIMEOUT: Duration = Duration::from_millis(1000);
