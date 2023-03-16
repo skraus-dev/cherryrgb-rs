@@ -84,6 +84,14 @@ fn calc_checksum(payload_type: u8, data: &[u8]) -> u16 {
     sum
 }
 
+/// Return true, if supplied product id is not blacklisted
+fn is_supported(product_id: u16) -> bool {
+    let blacklist: Vec<u16> = vec![
+        0xc122  // Cherry KC 1000
+    ];
+    !blacklist.contains(&product_id)
+}
+
 /// Find supported Cherry USB keyboards and return collection of (vendor_id, product_id)
 pub fn find_devices(product_id: Option<u16>) -> Result<Vec<(u16, u16)>> {
     let devices = rusb::devices()?;
@@ -93,6 +101,7 @@ pub fn find_devices(product_id: Option<u16>) -> Result<Vec<(u16, u16)>> {
         .iter()
         .map(|dev| dev.device_descriptor().unwrap())
         .filter(|desc| desc.vendor_id() == CHERRY_USB_VID)
+        .filter(|desc| is_supported(desc.product_id()))
         .filter(|desc| match product_id {
             Some(prod_id) => desc.product_id() == prod_id,
             None => true,
