@@ -5,7 +5,7 @@ use std::{
     str::FromStr,
 };
 
-/// Shorthand for structs implementing BinWrite to serialize into Vec<u8>
+/// Shorthand for structs implementing BinWrite to serialize into `Vec<u8>`
 pub trait ToVec: BinWrite {
     /// Shorthand for serializing into a Vec
     fn to_vec(self) -> Vec<u8>;
@@ -24,27 +24,19 @@ where
 }
 
 /// Wrap around RGB8 type, to implement traits on it
-#[derive(Clone, Debug)]
+#[derive(Clone, Default, Debug)]
 pub struct OwnRGB8(RGB8);
 
 impl OwnRGB8 {
     /// Create new instance by providing values for red, green, blue
     pub fn new(r: u8, g: u8, b: u8) -> Self {
-        Self {
-            0: RGB8 { r, g, b },
-        }
+        Self(RGB8 { r, g, b })
     }
 }
 
 impl From<RGB8> for OwnRGB8 {
     fn from(val: RGB8) -> Self {
-        Self { 0: val }
-    }
-}
-
-impl Default for OwnRGB8 {
-    fn default() -> Self {
-        Self { 0: RGB8::default() }
+        Self(val)
     }
 }
 
@@ -62,7 +54,7 @@ impl BinRead for OwnRGB8 {
             b: reader.read_ne()?,
         };
 
-        Ok(Self { 0: rgb })
+        Ok(Self(rgb))
     }
 }
 
