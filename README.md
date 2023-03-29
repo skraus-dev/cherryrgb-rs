@@ -91,3 +91,25 @@ In the following example we assume your product id is **0x00dd**.
 
 Use at your own risk.
 This project is not affiliated or endorsed by Cherry GmbH. 
+
+## Changelog
+
+### v0.2.1 - 08/08/2021
+* Refactor internal API
+* Models: Correct data_offset and checksum fields from u8 to u16
+
+### v0.2.0 - 29/07/2021
+* API: Improve usability by wrapping device communication inside struct CherryKeyboard
+
+### v0.1.2 - 28/07/2021
+* Implement enumerating all connected Cherry GmbH devices
+
+### v0.1.1 - 28/07/2021
+* Differentiate between payload and flags/commands
+* Rename LightingModes: Radar, Stars
+* Fix bug with missing padding
+* Add custom LED color setting
+* General code cleanup
+
+### v0.1.0 - 24/07/2021
+* Initial release
