@@ -73,6 +73,8 @@ pub use rusb;
 pub const CHERRY_USB_VID: u16 = 0x046a;
 /// USB Product ID - G80-3000N RGB TKL Keyboard
 pub const G80_3000N_RGB_TKL_USB_PID: u16 = 0x00dd;
+/// USB Product ID - MX 10.0N Keyboard
+pub const MX10N_USB_PID: u16 = 0x00df;
 const INTERFACE_NUM: u8 = 1;
 const INTERRUPT_EP: u8 = 0x82;
 static TIMEOUT: Duration = Duration::from_millis(1000);
@@ -84,6 +86,14 @@ fn calc_checksum(payload_type: u8, data: &[u8]) -> u16 {
     sum
 }
 
+/// Return true, if supplied product id is not blacklisted
+fn is_supported(product_id: u16) -> bool {
+    let blacklist: Vec<u16> = vec![
+        0xc122  // Cherry KC 1000
+    ];
+    !blacklist.contains(&product_id)
+}
+
 /// Find supported Cherry USB keyboards and return collection of (vendor_id, product_id)
 pub fn find_devices(product_id: Option<u16>) -> Result<Vec<(u16, u16)>> {
     let devices = rusb::devices()?;
@@ -93,6 +103,7 @@ pub fn find_devices(product_id: Option<u16>) -> Result<Vec<(u16, u16)>> {
         .iter()
         .map(|dev| dev.device_descriptor().unwrap())
         .filter(|desc| desc.vendor_id() == CHERRY_USB_VID)
+        .filter(|desc| is_supported(desc.product_id()))
         .filter(|desc| match product_id {
             Some(prod_id) => desc.product_id() == prod_id,
             None => true,
