@@ -75,6 +75,10 @@ jobs:
           cp ${{ github.workspace }}/README.md .
           cp ${{ github.workspace }}/COMPATIBILITY.md .
           cp ${{ github.workspace }}/LICENSE .
+          ###### For linux builds, copy the udev directory too ######
+          if [[ ${{ matrix.job.os-name }} == linux ]]; then
+            cp -r ${{ github.workspace }}/udev .
+          fi
 
           ####### reduce binary size by removing debug symbols #######
           BINARY_NAME=${{ matrix.project }}${{ matrix.job.binary-postfix }}

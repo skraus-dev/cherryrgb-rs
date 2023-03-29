@@ -67,6 +67,26 @@ cargo build
 
 Now you can run the binary from `./target/debug/cherryrgb_cli`
 
+
+## Troubleshooting
+
+### Keyboard device is not discovered aka. "Keyboard not found" in normal user context
+
+If the interaction with the keyboard is fine as root-user, you need to configure udev
+to adjust the ownership of the device handle, so a regular user can access it.
+
+The repository contains an example udev rule file `udev/99-cherryrgb.rules`.
+
+You might want to adjust it to only handle your specific product id (check via `lsusb`).
+
+In the following example we assume your product id is **0x00dd**.
+
+1. (optional) Change `ATTR{idProduct}=="*"` to `ATTR{idProduct}=="00dd"`.
+
+2. Copy the file to the correct location: `cp 99-cherryrgb.rules /etc/udev/rules.d/` (as a privileged user)
+
+3. Finally, reload the udev rules via `udevadm control --reload` and re-plug your keyboard.
+
 ## Disclaimer
 
 Use at your own risk.
