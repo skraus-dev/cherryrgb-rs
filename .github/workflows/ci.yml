@@ -111,6 +111,8 @@ jobs:
           toolchain: stable
           profile: minimal
           override: true
+      - name: Install cargo-tarpaulin
+        run: cargo install cargo-tarpaulin
       - name: Run cargo-tarpaulin
         uses: actions-rs/cargo@v1
         with:
