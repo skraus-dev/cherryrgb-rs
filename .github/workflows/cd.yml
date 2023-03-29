@@ -6,7 +6,7 @@ on:
 jobs:
 
   publish:
-    name: Publishing for ${{ matrix.job.os }}
+    name: Publishing for ${{ matrix.job.target }} ${{ matrix.job.os }} ${{ matrix.job.architecture }}
     runs-on: ${{ matrix.job.os }}
     strategy:
       matrix:
@@ -19,47 +19,48 @@ jobs:
             architecture: x86_64
             binary-postfix: ""
             use-cross: false
+            cargo-command: cargo
           - os: ubuntu-latest
             os-name: linux
             target: x86_64-unknown-linux-gnu
             architecture: x86_64
             binary-postfix: ""
             use-cross: false
+            cargo-command: cargo
           - os: windows-latest
             os-name: windows
             target: x86_64-pc-windows-msvc
             architecture: x86_64
             binary-postfix: ".exe"
             use-cross: false
+            cargo-command: cargo
           - os: ubuntu-latest
             os-name: linux
             target: aarch64-unknown-linux-gnu
             architecture: arm64
             binary-postfix: ""
             use-cross: true
+            cargo-command: cross
           - os: ubuntu-latest
             os-name: linux
             target: i686-unknown-linux-gnu
             architecture: i686
             binary-postfix: ""
             use-cross: true
+            cargo-command: cross
 
     steps:
-      - name: Install Rust toolchain
-        uses: actions-rs/toolchain@v1
-        with:
-          toolchain: ${{ matrix.rust }}
-          profile: minimal
-          override: true
       - name: Checkout repository
-        uses: actions/checkout@v2
-      - name: Cargo build
-        uses: actions-rs/cargo@v1
+        uses: actions/checkout@v3
+      - uses: dtolnay/rust-toolchain@stable
         with:
-          command: build
-          use-cross: ${{ matrix.job.use-cross }}
-          toolchain: ${{ matrix.rust }}
-          args: --release --target ${{ matrix.job.target }} --all
+          toolchain: stable
+      - name: Install cross
+        if: ${{ matrix.job.use-cross }}
+        run: cargo install cross
+
+      - name: Cargo build
+        run: ${{ matrix.job.cargo-command }} build --release --target ${{ matrix.job.target }} --all
 
       - name: install strip command
         shell: bash
@@ -71,15 +72,15 @@ jobs:
       - name: Packaging final binary
         shell: bash
         run: |
-          cd target/${{ matrix.job.target }}/release
-          cp ${{ github.workspace }}/README.md .
-          cp ${{ github.workspace }}/COMPATIBILITY.md .
-          cp ${{ github.workspace }}/LICENSE .
+          cp README.md target/${{ matrix.job.target }}/release/
+          cp COMPATIBILITY.md target/${{ matrix.job.target }}/release/
+          cp LICENSE target/${{ matrix.job.target }}/release/
           ###### For linux builds, copy the udev directory too ######
           if [[ ${{ matrix.job.os-name }} == linux ]]; then
-            cp -r ${{ github.workspace }}/udev .
+            cp -r udev target/${{ matrix.job.target }}/release/
           fi
 
+          cd target/${{ matrix.job.target }}/release
           ####### reduce binary size by removing debug symbols #######
           BINARY_NAME=${{ matrix.project }}${{ matrix.job.binary-postfix }}
           if [[ ${{ matrix.job.target }} == aarch64-unknown-linux-gnu ]]; then
@@ -98,7 +99,7 @@ jobs:
             shasum -a 256 $RELEASE_NAME.tar.gz > $RELEASE_NAME.sha256
           fi
       - name: Upload artifacts
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v3
         with:
           name: cherryrgb_cli
           path: target/${{ matrix.job.target }}/release/${{ matrix.project }}-*.tar.gz
@@ -117,13 +118,9 @@ jobs:
     if: startsWith(github.ref, 'refs/tags/')
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
-      - uses: actions-rs/toolchain@v1
+      - uses: actions/checkout@v3
+      - uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: stable
-          profile: minimal
-          override: true
-      - uses: actions-rs/cargo@v1
-        with:
-          command: publish
-          args: -p cherryrgb --token ${{ secrets.CARGO_API_KEY }}
+      - name: Publish crate
+        run: cargo publish -p cherryrgb --token ${{ secrets.CARGO_API_KEY }}
