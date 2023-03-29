@@ -215,7 +215,6 @@ impl CustomKeyLeds {
     pub fn new() -> Self {
         Self {
             key_leds: (0..CustomKeyLeds::TOTAL_KEYS)
-                .into_iter()
                 .map(|_| OwnRGB8::default())
                 .collect(),
         }
@@ -248,7 +247,6 @@ impl CustomKeyLeds {
 
         let result = key_data
             .chunks(CustomKeyLeds::CHUNK_SIZE)
-            .into_iter()
             .enumerate()
             .map(|(index, chunk)| {
                 let data_offset = index * CustomKeyLeds::CHUNK_SIZE;

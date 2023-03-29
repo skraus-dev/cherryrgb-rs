@@ -89,7 +89,7 @@ fn calc_checksum(payload_type: u8, data: &[u8]) -> u16 {
 /// Return true, if supplied product id is not blacklisted
 fn is_supported(product_id: u16) -> bool {
     let blacklist: Vec<u16> = vec![
-        0xc122  // Cherry KC 1000
+        0xc122, // Cherry KC 1000
     ];
     !blacklist.contains(&product_id)
 }
@@ -217,7 +217,7 @@ impl CherryKeyboard {
         };
         log::debug!(
             "<< INTERRUPT TRANSFER {:?}\n<< {}\n",
-            hex::encode(&response),
+            hex::encode(response),
             detail_info
         );
 
@@ -425,7 +425,7 @@ mod tests {
     fn test_checksum() {
         for (index, &pkt_str) in packets().iter().enumerate() {
             let pkt =
-                hex::decode(pkt_str.replace(" ", "")).expect("Failed to convert pkt hexstream");
+                hex::decode(pkt_str.replace(' ', "")).expect("Failed to convert pkt hexstream");
 
             let mut cursor = Cursor::new(&pkt[1..]);
             let expected_checksum: u16 = cursor.read_ne().expect("Failed to read checksum");
