@@ -116,5 +116,5 @@ jobs:
       - name: Run cargo-tarpaulin
         uses: actions-rs/cargo@v1
         with:
-          command: cargo-tarpaulin
+          command: tarpaulin
           args: --all-features --workspace --ignore-tests --out Lcov
