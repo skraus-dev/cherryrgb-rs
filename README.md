@@ -30,6 +30,16 @@ Please see [Docs.rs](https://docs.rs/cherryrgb)
 
 ## CLI
 
+Get usage help
+```
+# Top level
+./cherryrgb_cli --help
+
+# For each command
+./cherryrgb_cli animation --help
+./cherryrgb_cli custom-colors --help
+```
+
 Set LED animation
 
 * Color: #00ff00 (green)
@@ -38,7 +48,7 @@ Set LED animation
 * Brightness: medium
 
 ```
-./cherryrgb_cli -b medium animation rain slow 00ff00
+./cherryrgb_cli --brightness medium animation rain slow 00ff00
 ```
 
 Set custom key colors
@@ -48,7 +58,7 @@ Set custom key colors
 * Key 1 color: #0000ff
 
 ```
-./cherryrgb_cli -b full custom-colors ff00ff 0000ff
+./cherryrgb_cli --brightness full custom-colors ff00ff 0000ff
 ```
 
 ## Build from source
