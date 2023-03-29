@@ -70,28 +70,36 @@ jobs:
               sudo apt-get install -y binutils-aarch64-linux-gnu
           fi
       - name: Packaging final binary
+        env:
+          BINARY_NAME: ${{ matrix.project }}${{ matrix.job.binary-postfix }}
         shell: bash
         run: |
-          cp README.md target/${{ matrix.job.target }}/release/
-          cp COMPATIBILITY.md target/${{ matrix.job.target }}/release/
-          cp LICENSE target/${{ matrix.job.target }}/release/
+          mkdir release_tmp/
+
+          cp target/${{ matrix.job.target }}/release/$BINARY_NAME release_tmp/
+          cp README.md release_tmp/
+          cp COMPATIBILITY.md release_tmp/
+          cp LICENSE release_tmp/
+
           ###### For linux builds, copy the udev directory too ######
           if [[ ${{ matrix.job.os-name }} == linux ]]; then
-            cp -r udev target/${{ matrix.job.target }}/release/
+            cp -r udev release_tmp/
           fi
 
-          cd target/${{ matrix.job.target }}/release
+          cd release_tmp/
+
           ####### reduce binary size by removing debug symbols #######
-          BINARY_NAME=${{ matrix.project }}${{ matrix.job.binary-postfix }}
           if [[ ${{ matrix.job.target }} == aarch64-unknown-linux-gnu ]]; then
             GCC_PREFIX="aarch64-linux-gnu-"
           else
             GCC_PREFIX=""
           fi
           "$GCC_PREFIX"strip $BINARY_NAME
+
           ########## create tar.gz ##########
           RELEASE_NAME=${{ matrix.project }}-`basename ${GITHUB_REF}`-${{ matrix.job.os-name }}-${{ matrix.job.architecture }}
-          tar czvf $RELEASE_NAME.tar.gz $BINARY_NAME
+          tar czvf $RELEASE_NAME.tar.gz *
+
           ########## create sha256 ##########
           if [[ ${{ runner.os }} == 'Windows' ]]; then
             certutil -hashfile $RELEASE_NAME.tar.gz sha256 | grep -E [A-Fa-f0-9]{64} > $RELEASE_NAME.sha256
@@ -102,14 +110,14 @@ jobs:
         uses: actions/upload-artifact@v3
         with:
           name: cherryrgb_cli
-          path: target/${{ matrix.job.target }}/release/${{ matrix.project }}-*.tar.gz
+          path: release_tmp/${{ matrix.project }}-*.tar.gz
       - name: Releasing assets
         if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v1
         with:
           files: |
-            target/${{ matrix.job.target }}/release/${{ matrix.project }}-*.tar.gz
-            target/${{ matrix.job.target }}/release/${{ matrix.project }}-*.sha256
+            release_tmp/${{ matrix.project }}-*.tar.gz
+            release_tmp/${{ matrix.project }}-*.sha256
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
