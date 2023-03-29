@@ -112,6 +112,7 @@ jobs:
           profile: minimal
           override: true
       - name: Run cargo-tarpaulin
-        uses: actions-rs/tarpaulin@v0.1
+        uses: actions-rs/cargo@v1
         with:
-          args: '--all-features --workspace --ignore-tests --out Lcov'
+          command: cargo-tarpaulin
+          args: --all-features --workspace --ignore-tests --out Lcov
