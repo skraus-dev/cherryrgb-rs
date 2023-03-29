@@ -104,6 +104,13 @@ This project is not affiliated or endorsed by Cherry GmbH.
 
 ## Changelog
 
+### v0.2.2 - 29/03/2023
+* fix: Skip kernel driver detaching for non-unix platforms
+* Refactor parameter handling and help for enums (by @felfert)
+* Filter unsupported Cherry keyboards (by @felfert)
+* Improve README with usage and troubleshooting
+* Add example udev rules file
+
 ### v0.2.1 - 08/08/2021
 * Refactor internal API
 * Models: Correct data_offset and checksum fields from u8 to u16
