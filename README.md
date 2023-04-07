@@ -5,11 +5,9 @@
 [![GitHub release](https://img.shields.io/github/v/release/skraus-dev/cherryrgb-rs?include_prereleases)](https://github.com/skraus-dev/cherryrgb-rs/releases/latest)
 [![CI](https://github.com/skraus-dev/cherryrgb-rs/workflows/CI/badge.svg)](https://github.com/skraus-dev/cherryrgb-rs/actions)
 
-Tested with
-* Cherry Keyboard G80-3000N RGB (046a:00dd)
-* Cherry Keyboard MX10.0N       (046a:00df)
+## Compatibility
 
-See [Compatibility table](COMPATIBILITY.md)
+To see which devices are tested take a look at the [Compatibility Table](COMPATIBILITY.md).
 
 ## Features
 
@@ -31,7 +29,8 @@ Please see [Docs.rs](https://docs.rs/cherryrgb)
 ## CLI
 
 Get usage help
-```
+
+```shell
 # Top level
 ./cherryrgb_cli --help
 
@@ -47,7 +46,7 @@ Set LED animation
 * Speed: slow
 * Brightness: medium
 
-```
+```shell
 ./cherryrgb_cli --brightness medium animation rain slow 00ff00
 ```
 
@@ -57,7 +56,7 @@ Set custom key colors
 * Key 0 color: #ff00ff
 * Key 1 color: #0000ff
 
-```
+```shell
 ./cherryrgb_cli --brightness full custom-colors ff00ff 0000ff
 ```
 
@@ -65,18 +64,17 @@ Set custom key colors
 
 ### Dependencies
 
-- Rust (https://www.rust-lang.org/tools/install)
+* Rust (<https://www.rust-lang.org/tools/install>)
 
 ### Clone & Build
 
-```bash
+```shell
 git clone https://github.com/skraus-dev/cherryrgb-rs.git
 cd cherryrgb-rs
 cargo build
 ```
 
 Now you can run the binary from `./target/debug/cherryrgb_cli`
-
 
 ## Troubleshooting
 
@@ -100,11 +98,12 @@ In the following example we assume your product id is **0x00dd**.
 ## Disclaimer
 
 Use at your own risk.
-This project is not affiliated or endorsed by Cherry GmbH. 
+This project is not affiliated or endorsed by Cherry GmbH.
 
 ## Changelog
 
 ### v0.2.2 - 29/03/2023
+
 * fix: Skip kernel driver detaching for non-unix platforms
 * Refactor parameter handling and help for enums (by @felfert)
 * Filter unsupported Cherry keyboards (by @felfert)
@@ -112,16 +111,20 @@ This project is not affiliated or endorsed by Cherry GmbH.
 * Add example udev rules file
 
 ### v0.2.1 - 08/08/2021
+
 * Refactor internal API
 * Models: Correct data_offset and checksum fields from u8 to u16
 
 ### v0.2.0 - 29/07/2021
+
 * API: Improve usability by wrapping device communication inside struct CherryKeyboard
 
 ### v0.1.2 - 28/07/2021
+
 * Implement enumerating all connected Cherry GmbH devices
 
 ### v0.1.1 - 28/07/2021
+
 * Differentiate between payload and flags/commands
 * Rename LightingModes: Radar, Stars
 * Fix bug with missing padding
@@ -129,4 +132,5 @@ This project is not affiliated or endorsed by Cherry GmbH.
 * General code cleanup
 
 ### v0.1.0 - 24/07/2021
+
 * Initial release
