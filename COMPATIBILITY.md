@@ -12,7 +12,7 @@ Please send a Pull Request with your keyboard model once you can report on suppo
 | Name                          | PID                  | Tested? | Features (Animation / Custom Colors / Key Remap) |
 | ----------------------------- | -------------------- | --------| ------------------------------------------------ |
 | MX BOARD 3.0S FL NBL          | 0x0077               | ❌      | ❌ / ❌ / ❌ |
-| MX BOARD 3.0S FL RGB          | 0x0079               | ❌      | ❌ / ❌ / ❌ |
+| MX BOARD 3.0S FL RGB          | 0x0079               | ✅      | ✅ / ✅ / ❌ |
 | MX BOARD 3.0S FL RGB KOREAN   | 0x0083               | ❌      | ❌ / ❌ / ❌ |
 | MX 1.0 FL BL                  | 0x00AB               | ❌      | ❌ / ❌ / ❌ |
 | MX BOARD 1.0 TKL RGB          | 0x00AC               | ❌      | ❌ / ❌ / ❌ |
