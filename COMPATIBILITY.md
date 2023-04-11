@@ -20,7 +20,7 @@ Please send a Pull Request with your keyboard model once you can report on suppo
 | MX BOARD 10.0 FL RGB          | 0x00BB               | ❌      | ❌ / ❌ / ❌ |
 | G80 3000 TKL NBL              | 0x00C3               | ❌      | ❌ / ❌ / ❌ |
 | MX BOARD 2.0S FL RGB          | 0x00C4               | ❌      | ❌ / ❌ / ❌ |
-| G80 3000 TKL RGB              | 0x00C5               | ❌      | ❌ / ❌ / ❌ |
+| G80 3000 TKL RGB              | 0x00C5               | ✅      | ✅ / ✅ / ❌ |
 | MV BOARD 3.0 FL RGB           | 0x00C7               | ❌      | ❌ / ❌ / ❌ |
 | CCF MX 8.0 TKL BL             | 0x00C9               | ❌      | ❌ / ❌ / ❌ |
 | CCF MX 1.0 TKL BL             | 0x00CA               | ❌      | ❌ / ❌ / ❌ |
