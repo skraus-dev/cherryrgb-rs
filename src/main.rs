@@ -80,17 +80,17 @@ fn main() -> Result<()> {
     let keyboard =
         CherryKeyboard::new(vendor_id, product_id).context("Failed to create keyboard")?;
 
-    /* Fun begins */
-    keyboard
-        .fetch_device_state()
-        .context("Fetching device state failed")?;
-
     let loglevel = if opt.debug {
         log::Level::Debug
     } else {
         log::Level::Info
     };
     simple_logger::init_with_level(loglevel).unwrap();
+
+    /* Fun begins */
+    keyboard
+        .fetch_device_state()
+        .context("Fetching device state failed")?;
 
     match opt.command {
         CliCommand::CustomColors(args) => {

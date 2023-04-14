@@ -119,7 +119,7 @@ In the following example we assume your product id is **0x00dd**.
 
 2. Copy the file to the correct location: `cp 99-cherryrgb.rules /etc/udev/rules.d/` (as a privileged user)
 
-3. Finally, reload the udev rules via `udevadm control --reload` and re-plug your keyboard.
+3. Finally, reload the udev rules via `udevadm control --reload` and apply them using `udevadm trigger` or by re-plugging your keyboard.
 
 ## Disclaimer
 
