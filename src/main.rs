@@ -1,6 +1,7 @@
 use anyhow::{anyhow, Context, Result};
 use cherryrgb::{
-    self, rgb, Brightness, CherryKeyboard, CustomKeyLeds, LightingMode, OwnRGB8, Speed,
+    self, read_color_profile_file, rgb, Brightness, CherryKeyboard, CustomKeyLeds, LightingMode,
+    OwnRGB8, Speed,
 };
 use structopt::StructOpt;
 use strum::VariantNames;
@@ -29,9 +30,15 @@ struct CustomColorOptions {
 }
 
 #[derive(StructOpt, Debug)]
+struct ColorProfileFileOptions {
+    file_path: String,
+}
+
+#[derive(StructOpt, Debug)]
 enum CliCommand {
     Animation(AnimationArgs),
     CustomColors(CustomColorOptions),
+    ColorProfileFile(ColorProfileFileOptions),
 }
 
 #[derive(StructOpt, Debug)]
@@ -88,11 +95,22 @@ fn main() -> Result<()> {
     match opt.command {
         CliCommand::CustomColors(args) => {
             keyboard.reset_custom_colors()?;
-
             let mut keys = CustomKeyLeds::new();
 
             for (index, color) in args.colors.into_iter().enumerate() {
                 keys.set_led(index, color)?;
+            }
+
+            keyboard.set_custom_colors(keys)?;
+        }
+        CliCommand::ColorProfileFile(args) => {
+            let colors_from_file = read_color_profile_file(&args.file_path)
+                .context("reading colors from color file")?;
+
+            let mut keys = CustomKeyLeds::new();
+
+            for key_rgb in colors_from_file {
+                keys.set_led(key_rgb.key_index, key_rgb.rgb_value)?;
             }
 
             keyboard.set_custom_colors(keys)?;

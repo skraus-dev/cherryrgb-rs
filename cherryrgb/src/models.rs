@@ -190,6 +190,22 @@ pub struct CustomKeyLeds {
     key_leds: Vec<OwnRGB8>,
 }
 
+/// Represents a key-value pair for a key with an index and a corresponding color in a color profile.
+#[derive(Debug)]
+pub struct ProfileKey {
+    pub key_index: usize,
+    pub rgb_value: OwnRGB8,
+}
+
+impl ProfileKey {
+    pub fn new(key_index: usize, rgb: OwnRGB8) -> Self {
+        Self {
+            key_index: key_index,
+            rgb_value: rgb,
+        }
+    }
+}
+
 impl BinWrite for CustomKeyLeds {
     type Args = ();
 
