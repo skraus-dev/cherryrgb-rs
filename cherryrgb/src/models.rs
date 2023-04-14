@@ -198,9 +198,9 @@ pub struct ProfileKey {
 }
 
 impl ProfileKey {
-    pub fn new(key_index: usize, rgb: OwnRGB8) -> Self {
+    pub fn new(index: usize, rgb: OwnRGB8) -> Self {
         Self {
-            key_index: key_index,
+            key_index: index,
             rgb_value: rgb,
         }
     }
