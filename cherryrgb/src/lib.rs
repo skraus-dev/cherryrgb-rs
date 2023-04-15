@@ -57,9 +57,11 @@ mod models;
 
 use anyhow::{anyhow, Context, Result};
 use binrw::BinReaderExt;
+use models::ProfileKey;
 use rgb::RGB8;
 use rusb::UsbContext;
-use std::time::Duration;
+use serde_json::{self, Value};
+use std::{str::FromStr, time::Duration};
 
 // Re-exports
 pub use extensions::{OwnRGB8, ToVec};
@@ -71,13 +73,6 @@ pub use rusb;
 // Constants
 /// USB Vendor ID - Cherry GmbH
 pub const CHERRY_USB_VID: u16 = 0x046a;
-
-/// USB Product ID - G80-3000N RGB TKL Keyboard
-pub const G80_3000N_RGB_TKL_USB_PID: u16 = 0x00dd;
-/// USB Product ID - MX 10.0N Keyboard
-pub const MX10N_USB_PID: u16 = 0x00df;
-/// USB Product ID - MX Board 3.0 S RGB Keyboard
-pub const MX30S_RGB_PID: u16 = 0x0079;
 
 const INTERFACE_NUM: u8 = 1;
 const INTERRUPT_EP: u8 = 0x82;
@@ -120,6 +115,36 @@ pub fn find_devices(product_id: Option<u16>) -> Result<Vec<(u16, u16)>> {
     }
 
     Ok(usb_ids)
+}
+
+/// Reads the given color profile and returns a vector of `ProfileKey`.
+/// # Arguments
+/// * `color_profile` - Color profile content.
+pub fn read_color_profile(color_profile: &str) -> Result<Vec<ProfileKey>> {
+    let v: Value = serde_json::from_str(color_profile)?;
+
+    v.as_object().map_or(
+        Err(anyhow!(format!("No valid colors found in color profile."))),
+        |root| {
+            root.iter()
+                .map(|(key, value)| {
+                    let key_index = key
+                        .parse::<usize>()
+                        .context(format!("parsing key index {}", key))?;
+                    let color = value.as_str().map_or(
+                        Err(anyhow!(format!(
+                            "Invalid color for key with index {key_index}"
+                        ))),
+                        |hex| match OwnRGB8::from_str(hex) {
+                            Ok(color) => Ok(color),
+                            Err(e) => Err(anyhow!(e)).context(format!("parsing hex color '{hex}'")),
+                        },
+                    )?;
+                    Ok(ProfileKey::new(key_index, color))
+                })
+                .collect()
+        },
+    )
 }
 
 /// Holds a handle to the USB keyboard device
@@ -575,5 +600,25 @@ mod tests {
                 assert_eq!(1, 2)
             }
         }
+    }
+
+    #[test]
+    fn deserialize_color_profile() {
+        let color_profile = r#"
+            {
+                "0": "ff0000",
+                "1": "00ff00",
+                "2": "0000ff"
+            }
+        "#;
+
+        let match_this: Vec<ProfileKey> = vec![
+            ProfileKey::new(0, OwnRGB8::new(255, 0, 0)),
+            ProfileKey::new(1, OwnRGB8::new(0, 255, 0)),
+            ProfileKey::new(2, OwnRGB8::new(0, 0, 255)),
+        ];
+
+        let profile_keys = read_color_profile(color_profile).expect("Failed reading color profile");
+        assert_eq!(match_this, profile_keys);
     }
 }

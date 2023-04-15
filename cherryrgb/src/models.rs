@@ -4,6 +4,7 @@ use crate::{
 };
 use anyhow::{anyhow, Result};
 use binrw::{binrw, until_eof, BinRead, BinWrite, BinWriterExt};
+use std::convert::TryFrom;
 use strum_macros::{EnumString, EnumVariantNames};
 
 /// Modes support:
@@ -190,6 +191,22 @@ pub struct CustomKeyLeds {
     key_leds: Vec<OwnRGB8>,
 }
 
+/// Represents a key-value pair for a key with an index and a corresponding color in a color profile.
+#[derive(Debug, PartialEq)]
+pub struct ProfileKey {
+    pub key_index: usize,
+    pub rgb_value: OwnRGB8,
+}
+
+impl ProfileKey {
+    pub fn new(index: usize, rgb: OwnRGB8) -> Self {
+        Self {
+            key_index: index,
+            rgb_value: rgb,
+        }
+    }
+}
+
 impl BinWrite for CustomKeyLeds {
     type Args = ();
 
@@ -203,6 +220,20 @@ impl BinWrite for CustomKeyLeds {
             writer.write_ne(val)?;
         }
         Ok(())
+    }
+}
+
+impl TryFrom<Vec<ProfileKey>> for CustomKeyLeds {
+    type Error = anyhow::Error;
+
+    fn try_from(value: Vec<ProfileKey>) -> std::result::Result<Self, Self::Error> {
+        let mut custom_keys = Self::new();
+
+        for key_rgb in value {
+            custom_keys.set_led(key_rgb.key_index, key_rgb.rgb_value)?;
+        }
+
+        Ok(custom_keys)
     }
 }
 

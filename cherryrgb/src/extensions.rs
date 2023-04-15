@@ -24,7 +24,7 @@ where
 }
 
 /// Wrap around RGB8 type, to implement traits on it
-#[derive(Clone, Default, Debug)]
+#[derive(Clone, Default, Debug, PartialEq)]
 pub struct OwnRGB8(RGB8);
 
 impl OwnRGB8 {

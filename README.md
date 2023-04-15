@@ -17,6 +17,7 @@ Done
 * Set single-/multi-color (rainbow)
 * Set LED brightness
 * Set LED color per key
+* Load color profiles from files
 
 Missing
 
@@ -39,7 +40,7 @@ Get usage help
 ./cherryrgb_cli custom-colors --help
 ```
 
-Set LED animation
+### Set LED animation
 
 * Color: #00ff00 (green)
 * Mode: Rain
@@ -50,7 +51,7 @@ Set LED animation
 ./cherryrgb_cli --brightness medium animation rain slow 00ff00
 ```
 
-Set custom key colors
+### Set custom key colors
 
 * Brightness: full
 * Key 0 color: #ff00ff
@@ -58,6 +59,31 @@ Set custom key colors
 
 ```shell
 ./cherryrgb_cli --brightness full custom-colors ff00ff 0000ff
+```
+
+### Color profile file
+
+In addition to specifying custom colors via arguments you can create your custom color profiles in a separate file and pass the path of the file as an argument.
+
+Color profile file structure:
+
+```json
+{
+    "0": "ff00ff",
+    "1": "fffff",
+    "45": "00ff00",
+    "31": "ff0000"
+}
+```
+
+A profile file is a JSON file that contains a root object and a key value pair for each key.
+
+Each key is identified by its index. The colors are specified using hexadecimal color codes.
+
+Example:
+
+```shell
+./cherryrgb_cli --brightness full color-profile-file {FILE PATH}
 ```
 
 ## Build from source
