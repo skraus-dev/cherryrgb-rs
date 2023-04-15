@@ -618,10 +618,7 @@ mod tests {
             ProfileKey::new(2, OwnRGB8::new(0, 0, 255)),
         ];
 
-        let profile_keys = read_color_profile(color_profile);
-        match profile_keys {
-            Ok(keys) => assert_eq!(match_this, keys),
-            Err(e) => assert!(true == false, "{}", e),
-        }
+        let profile_keys = read_color_profile(color_profile).expect("Failed reading color profile");
+        assert_eq!(match_this, profile_keys);
     }
 }
