@@ -128,6 +128,14 @@ This project is not affiliated or endorsed by Cherry GmbH.
 
 ## Changelog
 
+### v0.2.3 - 15/04/2023
+
+* cli: Init logger before sending first packets
+* cli: Functionality to pass in colors for indexed keys via json file (by @luv4bytes)
+* README: Note about reloading udev rules (by @mpldr)
+* Compatibility report: MX BOARD 3.0S FL RGB (by @luv4bytes)
+* Compatibility report: G80 3000 TKL RGB (by @cewbdex)
+
 ### v0.2.2 - 29/03/2023
 
 * fix: Skip kernel driver detaching for non-unix platforms
