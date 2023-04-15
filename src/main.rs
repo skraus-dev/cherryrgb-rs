@@ -1,6 +1,8 @@
+use std::{io::Read, path::PathBuf};
+
 use anyhow::{anyhow, Context, Result};
 use cherryrgb::{
-    self, read_color_profile_file, rgb, Brightness, CherryKeyboard, CustomKeyLeds, LightingMode,
+    self, read_color_profile, rgb, Brightness, CherryKeyboard, CustomKeyLeds, LightingMode,
     OwnRGB8, Speed,
 };
 use structopt::StructOpt;
@@ -31,7 +33,8 @@ struct CustomColorOptions {
 
 #[derive(StructOpt, Debug)]
 struct ColorProfileFileOptions {
-    file_path: String,
+    #[structopt(parse(from_os_str))]
+    file_path: PathBuf,
 }
 
 #[derive(StructOpt, Debug)]
@@ -104,8 +107,19 @@ fn main() -> Result<()> {
             keyboard.set_custom_colors(keys)?;
         }
         CliCommand::ColorProfileFile(args) => {
-            let colors_from_file = read_color_profile_file(&args.file_path)
-                .context("reading colors from color file")?;
+            let path_str = args
+                .file_path
+                .to_str()
+                .map_or(String::new(), |p| p.to_string());
+
+            let mut f = std::fs::File::open(&args.file_path)
+                .context(format!("color profile '{path_str}'"))?;
+            let mut json: String = String::new();
+
+            f.read_to_string(&mut json)?;
+
+            let colors_from_file =
+                read_color_profile(&json).context("reading colors from color file")?;
 
             let mut keys = CustomKeyLeds::new();
 

@@ -191,7 +191,7 @@ pub struct CustomKeyLeds {
 }
 
 /// Represents a key-value pair for a key with an index and a corresponding color in a color profile.
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub struct ProfileKey {
     pub key_index: usize,
     pub rgb_value: OwnRGB8,

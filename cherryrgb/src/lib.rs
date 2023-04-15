@@ -61,7 +61,7 @@ use models::ProfileKey;
 use rgb::RGB8;
 use rusb::UsbContext;
 use serde_json::{self, Value};
-use std::{io::Read, str::FromStr, time::Duration};
+use std::{str::FromStr, time::Duration};
 
 // Re-exports
 pub use extensions::{OwnRGB8, ToVec};
@@ -120,16 +120,11 @@ pub fn find_devices(product_id: Option<u16>) -> Result<Vec<(u16, u16)>> {
 /// Reads the given color profile file and returns a vector of `ProfileKey`.
 /// # Arguments
 /// * `file_path` - Path of the file that holds the color profile information.
-pub fn read_color_profile_file(file_path: &str) -> Result<Vec<ProfileKey>> {
-    let mut f = std::fs::File::open(file_path).context(file_path.to_string())?;
-    let mut json: String = String::new();
-
-    f.read_to_string(&mut json)?;
-
-    let v: Value = serde_json::from_str(&json)?;
+pub fn read_color_profile(color_profile: &str) -> Result<Vec<ProfileKey>> {
+    let v: Value = serde_json::from_str(color_profile)?;
 
     v.as_object().map_or(
-        Err(anyhow!(format!("No valid colors found in '{file_path}'."))),
+        Err(anyhow!(format!("No valid colors found in color profile."))),
         |root| {
             root.iter()
                 .map(|(key, value)| {
@@ -604,6 +599,29 @@ mod tests {
             _ => {
                 assert_eq!(1, 2)
             }
+        }
+    }
+
+    #[test]
+    fn deserialize_color_profile() {
+        let color_profile = r#"
+            {
+                "0": "ff0000",
+                "1": "00ff00",
+                "2": "0000ff"
+            }
+        "#;
+
+        let match_this: Vec<ProfileKey> = vec![
+            ProfileKey::new(0, OwnRGB8::new(255, 0, 0)),
+            ProfileKey::new(1, OwnRGB8::new(0, 255, 0)),
+            ProfileKey::new(2, OwnRGB8::new(0, 0, 255)),
+        ];
+
+        let profile_keys = read_color_profile(color_profile);
+        match profile_keys {
+            Ok(keys) => assert_eq!(match_this, keys),
+            Err(e) => assert!(true == false, "{}", e),
         }
     }
 }
