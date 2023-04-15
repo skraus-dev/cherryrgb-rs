@@ -117,9 +117,9 @@ pub fn find_devices(product_id: Option<u16>) -> Result<Vec<(u16, u16)>> {
     Ok(usb_ids)
 }
 
-/// Reads the given color profile file and returns a vector of `ProfileKey`.
+/// Reads the given color profile and returns a vector of `ProfileKey`.
 /// # Arguments
-/// * `file_path` - Path of the file that holds the color profile information.
+/// * `color_profile` - Color profile content.
 pub fn read_color_profile(color_profile: &str) -> Result<Vec<ProfileKey>> {
     let v: Value = serde_json::from_str(color_profile)?;
 
