@@ -1,4 +1,4 @@
-use std::{io::Read, path::PathBuf};
+use std::{convert::TryFrom, io::Read, path::PathBuf};
 
 use anyhow::{anyhow, Context, Result};
 use cherryrgb::{
@@ -121,11 +121,8 @@ fn main() -> Result<()> {
             let colors_from_file =
                 read_color_profile(&json).context("reading colors from color file")?;
 
-            let mut keys = CustomKeyLeds::new();
-
-            for key_rgb in colors_from_file {
-                keys.set_led(key_rgb.key_index, key_rgb.rgb_value)?;
-            }
+            let keys =
+                CustomKeyLeds::try_from(colors_from_file).context("assembling custom key leds")?;
 
             keyboard.set_custom_colors(keys)?;
         }

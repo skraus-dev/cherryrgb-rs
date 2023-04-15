@@ -4,6 +4,7 @@ use crate::{
 };
 use anyhow::{anyhow, Result};
 use binrw::{binrw, until_eof, BinRead, BinWrite, BinWriterExt};
+use std::convert::TryFrom;
 use strum_macros::{EnumString, EnumVariantNames};
 
 /// Modes support:
@@ -219,6 +220,20 @@ impl BinWrite for CustomKeyLeds {
             writer.write_ne(val)?;
         }
         Ok(())
+    }
+}
+
+impl TryFrom<Vec<ProfileKey>> for CustomKeyLeds {
+    type Error = anyhow::Error;
+
+    fn try_from(value: Vec<ProfileKey>) -> std::result::Result<Self, Self::Error> {
+        let mut custom_keys = Self::new();
+
+        for key_rgb in value {
+            custom_keys.set_led(key_rgb.key_index, key_rgb.rgb_value)?;
+        }
+
+        Ok(custom_keys)
     }
 }
 
