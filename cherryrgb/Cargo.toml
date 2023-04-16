@@ -8,7 +8,7 @@ license = "MIT"
 homepage = "https://github.com/skraus-dev/cherryrgb-rs"
 
 [dependencies]
-anyhow = "1.0"
+thiserror = "1"
 binrw = "0.8"
 hex = "0.4"
 log = "0.4"

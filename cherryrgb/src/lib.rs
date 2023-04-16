@@ -55,13 +55,13 @@
 mod extensions;
 mod models;
 
-use anyhow::{anyhow, Context, Result};
 use binrw::BinReaderExt;
 use models::{Keymap, ProfileKey};
 use rgb::RGB8;
 use rusb::UsbContext;
 use serde_json::{self, Value};
 use std::{str::FromStr, time::Duration};
+use thiserror::Error;
 
 // Re-exports
 pub use extensions::{OwnRGB8, ToVec};
@@ -81,6 +81,28 @@ static TIMEOUT: Duration = Duration::from_millis(1000);
 /// (64 byte packet - 4 byte packet header - 4 byte payload header)
 const CHUNK_SIZE: usize = 56;
 const TOTAL_KEYS: usize = 126;
+
+#[derive(Debug, Error)]
+pub enum CherryRgbError {
+    #[error("Invalid argument")]
+    InvalidArgument(String, String),
+    #[error("USB Error")]
+    GeneralUsbError(#[from] rusb::Error),
+    #[error("USB Error, detail={0}")]
+    UsbError(String, rusb::Error),
+    #[error("Checksum error")]
+    ChecksumError {
+        calculated: u16,
+        expected: u16,
+        data: String,
+    },
+    #[error("Device not found")]
+    DeviceNotFoundError,
+    #[error("Parsing Error")]
+    ParseError(String),
+    #[error("Json Parsing Error")]
+    JsonParseError(#[from] serde_json::Error),
+}
 
 /// Calculate packet checksum (index 1 in payload)
 fn calc_checksum(payload_type: u8, data: &[u8]) -> u16 {
@@ -104,7 +126,7 @@ fn is_supported(product_id: u16) -> bool {
 }
 
 /// Find supported Cherry USB keyboards and return collection of (vendor_id, product_id)
-pub fn find_devices(product_id: Option<u16>) -> Result<Vec<(u16, u16)>> {
+pub fn find_devices(product_id: Option<u16>) -> Result<Vec<(u16, u16)>, CherryRgbError> {
     let devices = rusb::devices()?;
     // Search usb devices with VENDOR_ID of Cherry GmbH
     // If product_id is provided, filter for it too
@@ -121,7 +143,7 @@ pub fn find_devices(product_id: Option<u16>) -> Result<Vec<(u16, u16)>> {
         .collect();
 
     if usb_ids.is_empty() {
-        return Err(anyhow!("No matching devices found"));
+        return Err(CherryRgbError::DeviceNotFoundError);
     }
 
     Ok(usb_ids)
@@ -130,24 +152,28 @@ pub fn find_devices(product_id: Option<u16>) -> Result<Vec<(u16, u16)>> {
 /// Reads the given color profile and returns a vector of `ProfileKey`.
 /// # Arguments
 /// * `color_profile` - Color profile content.
-pub fn read_color_profile(color_profile: &str) -> Result<Vec<ProfileKey>> {
+pub fn read_color_profile(color_profile: &str) -> Result<Vec<ProfileKey>, CherryRgbError> {
     let v: Value = serde_json::from_str(color_profile)?;
 
     v.as_object().map_or(
-        Err(anyhow!(format!("No valid colors found in color profile."))),
+        Err(CherryRgbError::ParseError(
+            "No valid colors found in color profile.".into(),
+        )),
         |root| {
             root.iter()
                 .map(|(key, value)| {
-                    let key_index = key
-                        .parse::<usize>()
-                        .context(format!("parsing key index {}", key))?;
+                    let key_index = key.parse::<usize>().map_err(|err| {
+                        CherryRgbError::ParseError(format!("parsing key index {}, err={err}", key))
+                    })?;
                     let color = value.as_str().map_or(
-                        Err(anyhow!(format!(
+                        Err(CherryRgbError::ParseError(format!(
                             "Invalid color for key with index {key_index}"
                         ))),
                         |hex| match OwnRGB8::from_str(hex) {
                             Ok(color) => Ok(color),
-                            Err(e) => Err(anyhow!(e)).context(format!("parsing hex color '{hex}'")),
+                            Err(e) => Err(CherryRgbError::ParseError(format!(
+                                "Failed parsing hex color '{hex}', err: {e}"
+                            ))),
                         },
                     )?;
                     Ok(ProfileKey::new(key_index, color))
@@ -164,20 +190,21 @@ pub struct CherryKeyboard {
 
 impl CherryKeyboard {
     /// Init USB device by verifying number of configurations and claiming appropriate interface
-    pub fn new(vendor_id: u16, product_id: u16) -> Result<Self> {
-        let ctx = rusb::Context::new().context("Failed to create libusb context")?;
+    pub fn new(vendor_id: u16, product_id: u16) -> Result<Self, CherryRgbError> {
+        let ctx = rusb::Context::new()?;
 
         let mut device_handle = ctx
             .open_device_with_vid_pid(vendor_id, product_id)
-            .context("Keyboard not found")?;
+            .ok_or_else(|| CherryRgbError::DeviceNotFoundError)?;
 
         let device = device_handle.device();
         let device_desc = device
             .device_descriptor()
-            .context("Failed to read device descriptor")?;
+            .map_err(|e| CherryRgbError::UsbError("Failed to read device descriptor".into(), e))?;
+
         let config_desc = device
             .active_config_descriptor()
-            .context("Failed to get config descriptor")?;
+            .map_err(|e| CherryRgbError::UsbError("Failed to get config descriptor".into(), e))?;
 
         log::debug!(
             "* Connected to: Bus {:03} Device {:03} ID {:04x}:{:04x}",
@@ -194,24 +221,26 @@ impl CherryKeyboard {
         if cfg!(unix) {
             let kernel_driver_active = device_handle
                 .kernel_driver_active(INTERFACE_NUM)
-                .context("kernel_driver_active")?;
+                .map_err(|e| CherryRgbError::UsbError("kernel_driver_active".into(), e))?;
 
             if kernel_driver_active {
                 device_handle
                     .detach_kernel_driver(INTERFACE_NUM)
-                    .context("Failed to detach active kernel driver")?;
+                    .map_err(|e| {
+                        CherryRgbError::UsbError("Failed to detach active kernel driver".into(), e)
+                    })?;
             }
         }
 
         device_handle
             .claim_interface(INTERFACE_NUM)
-            .context("Failed to claim interface")?;
+            .map_err(|e| CherryRgbError::UsbError("Failed to claim interface".into(), e))?;
 
         Ok(Self { device_handle })
     }
 
     /// Writes a control packet first, then reads interrupt packet
-    fn send_payload(&self, payload: Payload) -> Result<Option<Packet<Payload>>> {
+    fn send_payload(&self, payload: Payload) -> Result<Option<Packet<Payload>>, CherryRgbError> {
         let packet = Packet::new(payload);
 
         // Serialize and pad to 64 bytes
@@ -232,7 +261,7 @@ impl CherryKeyboard {
                 &packet_bytes, // Data
                 TIMEOUT,
             )
-            .context("Control Write failure")?;
+            .map_err(|err| CherryRgbError::UsbError("Control Write failure".into(), err))?;
 
         log::debug!(
             ">> CONTROL TRANSFER {:?}\n>> {:?}\n",
@@ -246,7 +275,7 @@ impl CherryKeyboard {
                 &mut response, // read buffer
                 TIMEOUT,
             )
-            .context("Interrupt read failure")?;
+            .map_err(|err| CherryRgbError::UsbError("Interrupt read failure".into(), err))?;
 
         let resp_payload = std::io::Cursor::new(response).read_ne::<Packet<Payload>>();
         let detail_info = {
@@ -270,20 +299,20 @@ impl CherryKeyboard {
     }
 
     /// Start RGB setting transaction
-    fn start_transaction(&self) -> Result<()> {
+    fn start_transaction(&self) -> Result<(), CherryRgbError> {
         self.send_payload(Payload::TransactionStart)?;
 
         Ok(())
     }
 
     /// End RGB setting transaction
-    fn end_transaction(&self) -> Result<()> {
+    fn end_transaction(&self) -> Result<(), CherryRgbError> {
         self.send_payload(Payload::TransactionEnd)?;
 
         Ok(())
     }
 
-    fn get_keymap(&self) -> Result<Vec<Keymap>> {
+    fn get_keymap(&self) -> Result<Vec<Keymap>, CherryRgbError> {
         let mut buf: Vec<u8> = vec![];
 
         // 3 bytes per key are returned to reflect the keymap
@@ -315,7 +344,7 @@ impl CherryKeyboard {
         Ok(keymap)
     }
 
-    fn get_key_indexes(&self) -> Result<Vec<u8>> {
+    fn get_key_indexes(&self) -> Result<Vec<u8>, CherryRgbError> {
         let mut all_keys = vec![];
 
         for offset in (0..TOTAL_KEYS).step_by(CHUNK_SIZE) {
@@ -337,7 +366,7 @@ impl CherryKeyboard {
     }
 
     /// Just taken 1:1 from usb capture
-    pub fn fetch_device_state(&self) -> Result<()> {
+    pub fn fetch_device_state(&self) -> Result<(), CherryRgbError> {
         log::trace!("Fetching device state - START");
         self.start_transaction()?;
         self.send_payload(Payload::Unknown3 { unk: 0x22 })?;
@@ -358,7 +387,7 @@ impl CherryKeyboard {
         speed: Speed,
         color: C,
         rainbow: bool,
-    ) -> Result<()> {
+    ) -> Result<(), CherryRgbError> {
         log::trace!("Set LED animation - START");
         self.start_transaction()?;
         // Send main payload
@@ -389,7 +418,7 @@ impl CherryKeyboard {
     }
 
     /// Set custom color for each individual key
-    pub fn set_custom_colors(&self, key_leds: CustomKeyLeds) -> Result<()> {
+    pub fn set_custom_colors(&self, key_leds: CustomKeyLeds) -> Result<(), CherryRgbError> {
         log::trace!("Set custom colors - START");
         // Set custom led mode
         self.set_led_animation(
@@ -408,7 +437,7 @@ impl CherryKeyboard {
     }
 
     /// Reset custom key colors to default
-    pub fn reset_custom_colors(&self) -> Result<()> {
+    pub fn reset_custom_colors(&self) -> Result<(), CherryRgbError> {
         log::trace!("Reset custom colors - START");
         // Create array of blank / off LEDs
         self.set_custom_colors(CustomKeyLeds::new())?;
