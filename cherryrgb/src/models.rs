@@ -91,7 +91,13 @@ pub enum Payload {
     #[br(pre_assert(payload_type == 0x5))]
     Unknown5 { unk: u8 },
     #[br(pre_assert(payload_type == 0x7))]
-    Unknown7 { data_len: u8, data_offset: u16 },
+    GetKeymap {
+        data_len: u8,
+        data_offset: u16,
+        padding: u8,
+        #[br(count = data_len)]
+        keymap: Vec<u8>,
+    },
     #[br(pre_assert(payload_type == 0x6))]
     SetAnimation {
         unknown: [u8; 5],
@@ -113,7 +119,13 @@ pub enum Payload {
         key_leds_data: Vec<u8>,
     },
     #[br(pre_assert(payload_type == 0x1B))]
-    Unknown1B { data_len: u8, data_offset: u8 },
+    GetKeyIndexes {
+        data_len: u8,
+        data_offset: u16,
+        padding: u8,
+        #[br(count = data_len)]
+        key_data: Vec<u8>,
+    },
     Unhandled {
         #[br(parse_with = until_eof)]
         data: Vec<u8>,
@@ -127,10 +139,10 @@ impl PayloadType for Payload {
             Payload::TransactionEnd => 0x2,
             Payload::Unknown3 { .. } => 0x3,
             Payload::Unknown5 { .. } => 0x5,
-            Payload::Unknown7 { .. } => 0x7,
+            Payload::GetKeymap { .. } => 0x7,
             Payload::SetAnimation { .. } => 0x6,
             Payload::SetCustomLED { .. } => 0xB,
-            Payload::Unknown1B { .. } => 0x1B,
+            Payload::GetKeyIndexes { .. } => 0x1B,
             _ => {
                 log::error!("Unhandled Payload: {:?}", self);
                 0xFF

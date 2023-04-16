@@ -277,51 +277,72 @@ impl CherryKeyboard {
         Ok(())
     }
 
+    fn get_keymap(&self) -> Result<Vec<u32>> {
+        let mut buf: Vec<u8> = vec![];
+
+        // 3 bytes per key are returned to reflect the keymap
+        let total_size = TOTAL_KEYS * 3;
+        for offset in (0..total_size).step_by(CHUNK_SIZE) {
+            let len = std::cmp::min(total_size - offset, CHUNK_SIZE);
+
+            let keys = self.send_payload(Payload::GetKeymap {
+                data_len: len as u8,
+                data_offset: offset as u16,
+                padding: 0,
+                keymap: vec![],
+            })?;
+
+            if let Payload::GetKeymap { keymap, .. } = keys.unwrap().payload() {
+                buf.extend(keymap);
+            }
+        }
+
+        let keymap = buf
+            .chunks(3)
+            .into_iter()
+            .map(|x| {
+                let mut tmp: u32 = 0;
+                tmp |= (x[0] as u32) << 16;
+                tmp |= (x[1] as u32) << 8;
+                tmp |= x[2] as u32;
+
+                tmp
+            })
+            .collect();
+
+        Ok(keymap)
+    }
+
+    fn get_key_indexes(&self) -> Result<Vec<u8>> {
+        let mut all_keys = vec![];
+
+        for offset in (0..TOTAL_KEYS).step_by(CHUNK_SIZE) {
+            let len = std::cmp::min(TOTAL_KEYS - offset, CHUNK_SIZE);
+
+            let keys = self.send_payload(Payload::GetKeyIndexes {
+                data_len: len as u8,
+                data_offset: offset as u16,
+                padding: 0,
+                key_data: vec![],
+            })?;
+
+            if let Payload::GetKeyIndexes { key_data, .. } = keys.unwrap().payload() {
+                all_keys.extend(key_data)
+            }
+        }
+
+        Ok(all_keys)
+    }
+
     /// Just taken 1:1 from usb capture
     pub fn fetch_device_state(&self) -> Result<()> {
         log::trace!("Fetching device state - START");
         self.start_transaction()?;
         self.send_payload(Payload::Unknown3 { unk: 0x22 })?;
-        self.send_payload(Payload::Unknown7 {
-            data_len: 0x38,
-            data_offset: 0x00,
-        })?;
-        self.send_payload(Payload::Unknown7 {
-            data_len: 0x38,
-            data_offset: 0x38,
-        })?;
-        self.send_payload(Payload::Unknown7 {
-            data_len: 0x38,
-            data_offset: 0x70,
-        })?;
-        self.send_payload(Payload::Unknown7 {
-            data_len: 0x38,
-            data_offset: 0xA8,
-        })?;
-        self.send_payload(Payload::Unknown7 {
-            data_len: 0x38,
-            data_offset: 0xE0,
-        })?;
-        self.send_payload(Payload::Unknown7 {
-            data_len: 0x38,
-            data_offset: 0x118,
-        })?;
-        self.send_payload(Payload::Unknown7 {
-            data_len: 0x2A,
-            data_offset: 0x150,
-        })?;
-        self.send_payload(Payload::Unknown1B {
-            data_len: 0x38,
-            data_offset: 0x00,
-        })?;
-        self.send_payload(Payload::Unknown1B {
-            data_len: 0x38,
-            data_offset: 0x38,
-        })?;
-        self.send_payload(Payload::Unknown1B {
-            data_len: 0x0E,
-            data_offset: 0x70,
-        })?;
+        let keymap = self.get_keymap()?;
+        log::debug!("Keymap: {keymap:?}");
+        let key_indexes = self.get_key_indexes()?;
+        log::debug!("Key indexes: {key_indexes:?}");
         self.end_transaction()?;
         log::trace!("Fetching device state - END");
         Ok(())
