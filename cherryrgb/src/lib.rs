@@ -69,6 +69,7 @@ pub use hex;
 pub use models::{Brightness, CustomKeyLeds, LightingMode, Packet, Payload, Speed};
 pub use rgb;
 pub use rusb;
+pub use strum;
 
 // Constants
 /// USB Vendor ID - Cherry GmbH

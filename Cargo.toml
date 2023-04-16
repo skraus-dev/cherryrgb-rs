@@ -11,7 +11,6 @@ cherryrgb = { path = "cherryrgb" }
 anyhow = "1.0"
 structopt = "0.3"
 log = "0.4"
-strum = "0.24.1"
 
 [dependencies.simple_logger]
 version = "1.13"

@@ -104,7 +104,6 @@ dependencies = [
  "log",
  "simple_logger",
  "structopt",
- "strum",
 ]
 
 [[package]]

@@ -1,12 +1,12 @@
 use std::{convert::TryFrom, io::Read, path::PathBuf};
 
 use anyhow::{anyhow, Context, Result};
+use cherryrgb::strum::VariantNames;
 use cherryrgb::{
     self, read_color_profile, rgb, Brightness, CherryKeyboard, CustomKeyLeds, LightingMode,
     OwnRGB8, Speed,
 };
 use structopt::StructOpt;
-use strum::VariantNames;
 
 #[derive(StructOpt, Debug)]
 struct AnimationArgs {
