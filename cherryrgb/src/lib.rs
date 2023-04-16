@@ -205,7 +205,7 @@ impl CherryKeyboard {
     }
 
     /// Writes a control packet first, then reads interrupt packet
-    fn send_payload(&self, payload: Payload) -> Result<Vec<u8>> {
+    fn send_payload(&self, payload: Payload) -> Result<Option<Packet<Payload>>> {
         let packet = Packet::new(payload);
 
         // Serialize and pad to 64 bytes
@@ -242,8 +242,9 @@ impl CherryKeyboard {
             )
             .context("Interrupt read failure")?;
 
+        let resp_payload = std::io::Cursor::new(response).read_ne::<Packet<Payload>>();
         let detail_info = {
-            match std::io::Cursor::new(response).read_ne::<Packet<Payload>>() {
+            match &resp_payload {
                 Ok(pkt) => format!("{:?} Checksum valid: {:?}", pkt, pkt.verify_checksum()),
                 Err(e) => format!("Failed to parse, err: {:?}", e),
             }
@@ -254,7 +255,12 @@ impl CherryKeyboard {
             detail_info
         );
 
-        Ok(response.to_vec())
+        let res = match resp_payload {
+            Ok(pkt) => Some(pkt),
+            Err(_) => None,
+        };
+
+        Ok(res)
     }
 
     /// Start RGB setting transaction
