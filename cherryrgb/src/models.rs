@@ -73,6 +73,15 @@ pub enum Brightness {
     Full = 4,
 }
 
+/// Represents the mapping of a key to a certain function/keycode
+#[binrw]
+#[derive(Clone, Debug)]
+pub struct Keymap {
+    pub modifier: u8,
+    pub unk: u8,
+    pub keycode: u8,
+}
+
 pub trait PayloadType {
     fn payload_type(&self) -> u8;
 }

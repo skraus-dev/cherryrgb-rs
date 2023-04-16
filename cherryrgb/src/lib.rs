@@ -57,7 +57,7 @@ mod models;
 
 use anyhow::{anyhow, Context, Result};
 use binrw::BinReaderExt;
-use models::ProfileKey;
+use models::{Keymap, ProfileKey};
 use rgb::RGB8;
 use rusb::UsbContext;
 use serde_json::{self, Value};
@@ -87,9 +87,7 @@ fn calc_checksum(payload_type: u8, data: &[u8]) -> u16 {
     // FIXME: Cleanup this quickfix..
     let to_hash = match payload_type {
         // Only hash 4 bytes if payload is (GetKeymap || GetKeyIndexes)
-        0x7 | 0x1B => {
-            std::cmp::min(data.len(), 0x4)
-        },
+        0x7 | 0x1B => std::cmp::min(data.len(), 0x4),
         _ => data.len(),
     };
     let sum = data[..to_hash].iter().map(|&i| i as u16).sum::<u16>() + (payload_type as u16);
@@ -285,7 +283,7 @@ impl CherryKeyboard {
         Ok(())
     }
 
-    fn get_keymap(&self) -> Result<Vec<u32>> {
+    fn get_keymap(&self) -> Result<Vec<Keymap>> {
         let mut buf: Vec<u8> = vec![];
 
         // 3 bytes per key are returned to reflect the keymap
@@ -307,14 +305,10 @@ impl CherryKeyboard {
 
         let keymap = buf
             .chunks(3)
-            .into_iter()
-            .map(|x| {
-                let mut tmp: u32 = 0;
-                tmp |= (x[0] as u32) << 16;
-                tmp |= (x[1] as u32) << 8;
-                tmp |= x[2] as u32;
-
-                tmp
+            .map(|x| Keymap {
+                modifier: x[0],
+                unk: x[1],
+                keycode: x[2],
             })
             .collect();
 
