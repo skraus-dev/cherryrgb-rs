@@ -1,6 +1,7 @@
 use crate::{
     calc_checksum,
     extensions::{OwnRGB8, ToVec},
+    CHUNK_SIZE, TOTAL_KEYS,
 };
 use anyhow::{anyhow, Result};
 use binrw::{binrw, until_eof, BinRead, BinWrite, BinWriterExt};
@@ -238,22 +239,16 @@ impl TryFrom<Vec<ProfileKey>> for CustomKeyLeds {
 }
 
 impl CustomKeyLeds {
-    /// (64 byte packet - 4 byte packet header - 4 byte payload header)
-    const CHUNK_SIZE: usize = 56;
-    const TOTAL_KEYS: usize = 126;
-
     /// Initialize with inactive colors (000000) for all keys
     pub fn new() -> Self {
         Self {
-            key_leds: (0..CustomKeyLeds::TOTAL_KEYS)
-                .map(|_| OwnRGB8::default())
-                .collect(),
+            key_leds: (0..TOTAL_KEYS).map(|_| OwnRGB8::default()).collect(),
         }
     }
 
     /// Initialize from collection of RGB8 values
     pub fn from_leds<C: Into<OwnRGB8>>(key_leds: Vec<C>) -> Result<Self> {
-        if key_leds.len() > CustomKeyLeds::TOTAL_KEYS {
+        if key_leds.len() > TOTAL_KEYS {
             return Err(anyhow!("Invalid number of key leds"));
         }
 
@@ -277,10 +272,10 @@ impl CustomKeyLeds {
         let key_data = self.to_vec();
 
         let result = key_data
-            .chunks(CustomKeyLeds::CHUNK_SIZE)
+            .chunks(CHUNK_SIZE)
             .enumerate()
             .map(|(index, chunk)| {
-                let data_offset = index * CustomKeyLeds::CHUNK_SIZE;
+                let data_offset = index * CHUNK_SIZE;
 
                 Payload::SetCustomLED {
                     data_offset: data_offset as u16,

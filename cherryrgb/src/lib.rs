@@ -78,6 +78,10 @@ const INTERFACE_NUM: u8 = 1;
 const INTERRUPT_EP: u8 = 0x82;
 static TIMEOUT: Duration = Duration::from_millis(1000);
 
+/// (64 byte packet - 4 byte packet header - 4 byte payload header)
+const CHUNK_SIZE: usize = 56;
+const TOTAL_KEYS: usize = 126;
+
 /// Calculate packet checksum (index 1 in payload)
 fn calc_checksum(payload_type: u8, data: &[u8]) -> u16 {
     let sum = data.iter().map(|&i| i as u16).sum::<u16>() + (payload_type as u16);
