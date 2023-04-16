@@ -102,6 +102,10 @@ cargo build
 
 Now you can run the binary from `./target/debug/cherryrgb_cli`
 
+## Install through package manager
+
+- AUR: [<code>cherryrgb</code>](https://aur.archlinux.org/packages/cherryrgb)
+
 ## Troubleshooting
 
 ### Keyboard device is not discovered aka. "Keyboard not found" in normal user context
