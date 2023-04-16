@@ -84,7 +84,15 @@ const TOTAL_KEYS: usize = 126;
 
 /// Calculate packet checksum (index 1 in payload)
 fn calc_checksum(payload_type: u8, data: &[u8]) -> u16 {
-    let sum = data.iter().map(|&i| i as u16).sum::<u16>() + (payload_type as u16);
+    // FIXME: Cleanup this quickfix..
+    let to_hash = match payload_type {
+        // Only hash 4 bytes if payload is (GetKeymap || GetKeyIndexes)
+        0x7 | 0x1B => {
+            std::cmp::min(data.len(), 0x4)
+        },
+        _ => data.len(),
+    };
+    let sum = data[..to_hash].iter().map(|&i| i as u16).sum::<u16>() + (payload_type as u16);
 
     sum
 }
