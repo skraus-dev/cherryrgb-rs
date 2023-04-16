@@ -1,6 +1,7 @@
 use crate::{
     calc_checksum,
     extensions::{OwnRGB8, ToVec},
+    CHUNK_SIZE, TOTAL_KEYS,
 };
 use anyhow::{anyhow, Result};
 use binrw::{binrw, until_eof, BinRead, BinWrite, BinWriterExt};
@@ -72,6 +73,15 @@ pub enum Brightness {
     Full = 4,
 }
 
+/// Represents the mapping of a key to a certain function/keycode
+#[binrw]
+#[derive(Clone, Debug)]
+pub struct Keymap {
+    pub modifier: u8,
+    pub unk: u8,
+    pub keycode: u8,
+}
+
 pub trait PayloadType {
     fn payload_type(&self) -> u8;
 }
@@ -90,7 +100,13 @@ pub enum Payload {
     #[br(pre_assert(payload_type == 0x5))]
     Unknown5 { unk: u8 },
     #[br(pre_assert(payload_type == 0x7))]
-    Unknown7 { data_len: u8, data_offset: u16 },
+    GetKeymap {
+        data_len: u8,
+        data_offset: u16,
+        padding: u8,
+        #[br(count = data_len)]
+        keymap: Vec<u8>,
+    },
     #[br(pre_assert(payload_type == 0x6))]
     SetAnimation {
         unknown: [u8; 5],
@@ -112,7 +128,13 @@ pub enum Payload {
         key_leds_data: Vec<u8>,
     },
     #[br(pre_assert(payload_type == 0x1B))]
-    Unknown1B { data_len: u8, data_offset: u8 },
+    GetKeyIndexes {
+        data_len: u8,
+        data_offset: u16,
+        padding: u8,
+        #[br(count = data_len)]
+        key_data: Vec<u8>,
+    },
     Unhandled {
         #[br(parse_with = until_eof)]
         data: Vec<u8>,
@@ -126,10 +148,10 @@ impl PayloadType for Payload {
             Payload::TransactionEnd => 0x2,
             Payload::Unknown3 { .. } => 0x3,
             Payload::Unknown5 { .. } => 0x5,
-            Payload::Unknown7 { .. } => 0x7,
+            Payload::GetKeymap { .. } => 0x7,
             Payload::SetAnimation { .. } => 0x6,
             Payload::SetCustomLED { .. } => 0xB,
-            Payload::Unknown1B { .. } => 0x1B,
+            Payload::GetKeyIndexes { .. } => 0x1B,
             _ => {
                 log::error!("Unhandled Payload: {:?}", self);
                 0xFF
@@ -238,22 +260,16 @@ impl TryFrom<Vec<ProfileKey>> for CustomKeyLeds {
 }
 
 impl CustomKeyLeds {
-    /// (64 byte packet - 4 byte packet header - 4 byte payload header)
-    const CHUNK_SIZE: usize = 56;
-    const TOTAL_KEYS: usize = 126;
-
     /// Initialize with inactive colors (000000) for all keys
     pub fn new() -> Self {
         Self {
-            key_leds: (0..CustomKeyLeds::TOTAL_KEYS)
-                .map(|_| OwnRGB8::default())
-                .collect(),
+            key_leds: (0..TOTAL_KEYS).map(|_| OwnRGB8::default()).collect(),
         }
     }
 
     /// Initialize from collection of RGB8 values
     pub fn from_leds<C: Into<OwnRGB8>>(key_leds: Vec<C>) -> Result<Self> {
-        if key_leds.len() > CustomKeyLeds::TOTAL_KEYS {
+        if key_leds.len() > TOTAL_KEYS {
             return Err(anyhow!("Invalid number of key leds"));
         }
 
@@ -277,10 +293,10 @@ impl CustomKeyLeds {
         let key_data = self.to_vec();
 
         let result = key_data
-            .chunks(CustomKeyLeds::CHUNK_SIZE)
+            .chunks(CHUNK_SIZE)
             .enumerate()
             .map(|(index, chunk)| {
-                let data_offset = index * CustomKeyLeds::CHUNK_SIZE;
+                let data_offset = index * CHUNK_SIZE;
 
                 Payload::SetCustomLED {
                     data_offset: data_offset as u16,

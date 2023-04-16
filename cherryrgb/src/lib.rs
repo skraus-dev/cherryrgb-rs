@@ -57,7 +57,7 @@ mod models;
 
 use anyhow::{anyhow, Context, Result};
 use binrw::BinReaderExt;
-use models::ProfileKey;
+use models::{Keymap, ProfileKey};
 use rgb::RGB8;
 use rusb::UsbContext;
 use serde_json::{self, Value};
@@ -78,9 +78,19 @@ const INTERFACE_NUM: u8 = 1;
 const INTERRUPT_EP: u8 = 0x82;
 static TIMEOUT: Duration = Duration::from_millis(1000);
 
+/// (64 byte packet - 4 byte packet header - 4 byte payload header)
+const CHUNK_SIZE: usize = 56;
+const TOTAL_KEYS: usize = 126;
+
 /// Calculate packet checksum (index 1 in payload)
 fn calc_checksum(payload_type: u8, data: &[u8]) -> u16 {
-    let sum = data.iter().map(|&i| i as u16).sum::<u16>() + (payload_type as u16);
+    // FIXME: Cleanup this quickfix..
+    let to_hash = match payload_type {
+        // Only hash 4 bytes if payload is (GetKeymap || GetKeyIndexes)
+        0x7 | 0x1B => std::cmp::min(data.len(), 0x4),
+        _ => data.len(),
+    };
+    let sum = data[..to_hash].iter().map(|&i| i as u16).sum::<u16>() + (payload_type as u16);
 
     sum
 }
@@ -201,7 +211,7 @@ impl CherryKeyboard {
     }
 
     /// Writes a control packet first, then reads interrupt packet
-    fn send_payload(&self, payload: Payload) -> Result<Vec<u8>> {
+    fn send_payload(&self, payload: Payload) -> Result<Option<Packet<Payload>>> {
         let packet = Packet::new(payload);
 
         // Serialize and pad to 64 bytes
@@ -238,8 +248,9 @@ impl CherryKeyboard {
             )
             .context("Interrupt read failure")?;
 
+        let resp_payload = std::io::Cursor::new(response).read_ne::<Packet<Payload>>();
         let detail_info = {
-            match std::io::Cursor::new(response).read_ne::<Packet<Payload>>() {
+            match &resp_payload {
                 Ok(pkt) => format!("{:?} Checksum valid: {:?}", pkt, pkt.verify_checksum()),
                 Err(e) => format!("Failed to parse, err: {:?}", e),
             }
@@ -250,7 +261,12 @@ impl CherryKeyboard {
             detail_info
         );
 
-        Ok(response.to_vec())
+        let res = match resp_payload {
+            Ok(pkt) => Some(pkt),
+            Err(_) => None,
+        };
+
+        Ok(res)
     }
 
     /// Start RGB setting transaction
@@ -267,51 +283,68 @@ impl CherryKeyboard {
         Ok(())
     }
 
+    fn get_keymap(&self) -> Result<Vec<Keymap>> {
+        let mut buf: Vec<u8> = vec![];
+
+        // 3 bytes per key are returned to reflect the keymap
+        let total_size = TOTAL_KEYS * 3;
+        for offset in (0..total_size).step_by(CHUNK_SIZE) {
+            let len = std::cmp::min(total_size - offset, CHUNK_SIZE);
+
+            let keys = self.send_payload(Payload::GetKeymap {
+                data_len: len as u8,
+                data_offset: offset as u16,
+                padding: 0,
+                keymap: vec![],
+            })?;
+
+            if let Payload::GetKeymap { keymap, .. } = keys.unwrap().payload() {
+                buf.extend(keymap);
+            }
+        }
+
+        let keymap = buf
+            .chunks(3)
+            .map(|x| Keymap {
+                modifier: x[0],
+                unk: x[1],
+                keycode: x[2],
+            })
+            .collect();
+
+        Ok(keymap)
+    }
+
+    fn get_key_indexes(&self) -> Result<Vec<u8>> {
+        let mut all_keys = vec![];
+
+        for offset in (0..TOTAL_KEYS).step_by(CHUNK_SIZE) {
+            let len = std::cmp::min(TOTAL_KEYS - offset, CHUNK_SIZE);
+
+            let keys = self.send_payload(Payload::GetKeyIndexes {
+                data_len: len as u8,
+                data_offset: offset as u16,
+                padding: 0,
+                key_data: vec![],
+            })?;
+
+            if let Payload::GetKeyIndexes { key_data, .. } = keys.unwrap().payload() {
+                all_keys.extend(key_data)
+            }
+        }
+
+        Ok(all_keys)
+    }
+
     /// Just taken 1:1 from usb capture
     pub fn fetch_device_state(&self) -> Result<()> {
         log::trace!("Fetching device state - START");
         self.start_transaction()?;
         self.send_payload(Payload::Unknown3 { unk: 0x22 })?;
-        self.send_payload(Payload::Unknown7 {
-            data_len: 0x38,
-            data_offset: 0x00,
-        })?;
-        self.send_payload(Payload::Unknown7 {
-            data_len: 0x38,
-            data_offset: 0x38,
-        })?;
-        self.send_payload(Payload::Unknown7 {
-            data_len: 0x38,
-            data_offset: 0x70,
-        })?;
-        self.send_payload(Payload::Unknown7 {
-            data_len: 0x38,
-            data_offset: 0xA8,
-        })?;
-        self.send_payload(Payload::Unknown7 {
-            data_len: 0x38,
-            data_offset: 0xE0,
-        })?;
-        self.send_payload(Payload::Unknown7 {
-            data_len: 0x38,
-            data_offset: 0x118,
-        })?;
-        self.send_payload(Payload::Unknown7 {
-            data_len: 0x2A,
-            data_offset: 0x150,
-        })?;
-        self.send_payload(Payload::Unknown1B {
-            data_len: 0x38,
-            data_offset: 0x00,
-        })?;
-        self.send_payload(Payload::Unknown1B {
-            data_len: 0x38,
-            data_offset: 0x38,
-        })?;
-        self.send_payload(Payload::Unknown1B {
-            data_len: 0x0E,
-            data_offset: 0x70,
-        })?;
+        let keymap = self.get_keymap()?;
+        log::debug!("Keymap: {keymap:?}");
+        let key_indexes = self.get_key_indexes()?;
+        log::debug!("Key indexes: {key_indexes:?}");
         self.end_transaction()?;
         log::trace!("Fetching device state - END");
         Ok(())
