@@ -1,9 +1,9 @@
 use crate::{
     calc_checksum,
     extensions::{OwnRGB8, ToVec},
-    CHUNK_SIZE, TOTAL_KEYS,
+    CherryRgbError, CHUNK_SIZE, TOTAL_KEYS,
 };
-use anyhow::{anyhow, Result};
+
 use binrw::{binrw, until_eof, BinRead, BinWrite, BinWriterExt};
 use std::convert::TryFrom;
 use strum_macros::{EnumString, EnumVariantNames};
@@ -193,16 +193,17 @@ where
     }
 
     /// Verify checksum
-    pub fn verify_checksum(&self) -> Result<()> {
-        let calculated = calc_checksum(self.inner.payload_type(), &self.inner.clone().to_vec());
+    pub fn verify_checksum(&self) -> Result<(), CherryRgbError> {
+        let payload = self.inner.clone().to_vec();
+        let calculated = calc_checksum(self.inner.payload_type(), &payload);
         if calculated == self.checksum {
             Ok(())
         } else {
-            Err(anyhow!(
-                "Invalid checksum, expected: {}, got: {}",
+            Err(CherryRgbError::ChecksumError {
+                expected: self.checksum,
                 calculated,
-                self.checksum
-            ))
+                data: hex::encode(&payload),
+            })
         }
     }
 }
@@ -246,7 +247,7 @@ impl BinWrite for CustomKeyLeds {
 }
 
 impl TryFrom<Vec<ProfileKey>> for CustomKeyLeds {
-    type Error = anyhow::Error;
+    type Error = CherryRgbError;
 
     fn try_from(value: Vec<ProfileKey>) -> std::result::Result<Self, Self::Error> {
         let mut custom_keys = Self::new();
@@ -268,9 +269,12 @@ impl CustomKeyLeds {
     }
 
     /// Initialize from collection of RGB8 values
-    pub fn from_leds<C: Into<OwnRGB8>>(key_leds: Vec<C>) -> Result<Self> {
+    pub fn from_leds<C: Into<OwnRGB8>>(key_leds: Vec<C>) -> Result<Self, CherryRgbError> {
         if key_leds.len() > TOTAL_KEYS {
-            return Err(anyhow!("Invalid number of key leds"));
+            return Err(CherryRgbError::InvalidArgument(
+                "Invalid number of key leds".into(),
+                key_leds.len().to_string(),
+            ));
         }
 
         Ok(Self {
@@ -279,9 +283,16 @@ impl CustomKeyLeds {
     }
 
     /// Set color for particular key at provided index
-    pub fn set_led<C: Into<OwnRGB8>>(&mut self, key_index: usize, key: C) -> Result<()> {
+    pub fn set_led<C: Into<OwnRGB8>>(
+        &mut self,
+        key_index: usize,
+        key: C,
+    ) -> Result<(), CherryRgbError> {
         if key_index >= self.key_leds.len() {
-            return Err(anyhow!("Key index out of bounds"));
+            return Err(CherryRgbError::InvalidArgument(
+                "Key index out of bounds".into(),
+                key_index.to_string(),
+            ));
         }
 
         self.key_leds[key_index] = key.into();
@@ -289,7 +300,7 @@ impl CustomKeyLeds {
     }
 
     /// Get array of payloads to be then provided to `send_payload`
-    pub fn get_payloads(self) -> Result<Vec<Payload>> {
+    pub fn get_payloads(self) -> Result<Vec<Payload>, CherryRgbError> {
         let key_data = self.to_vec();
 
         let result = key_data
