@@ -182,15 +182,9 @@ impl CherryKeyboard {
 
         // Skip kernel driver detachment for non-unix platforms
         if cfg!(unix) {
-            let kernel_driver_active = device_handle
-                .kernel_driver_active(INTERFACE_NUM)
-                .context("kernel_driver_active")?;
-
-            if kernel_driver_active {
-                device_handle
-                    .detach_kernel_driver(INTERFACE_NUM)
-                    .context("Failed to detach active kernel driver")?;
-            }
+            device_handle
+                .set_auto_detach_kernel_driver(true)
+                .context("Failed to detach active kernel driver")?;
         }
 
         device_handle
