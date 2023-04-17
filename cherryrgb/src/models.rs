@@ -74,12 +74,11 @@ pub enum Brightness {
 }
 
 /// Represents the mapping of a key to a certain function/keycode
-#[binrw]
+/// If its parseable, return ::Parsed variant; if not, return the raw values
 #[derive(Clone, Debug)]
-pub struct Keymap {
-    pub modifier: u8,
-    pub unk: u8,
-    pub keycode: u8,
+pub enum CherryKey {
+    Parsed(keycode::KeyMap),
+    Raw { maybe_mod: u8, keycode: u16 },
 }
 
 pub trait PayloadType {

@@ -56,11 +56,15 @@ mod extensions;
 mod models;
 
 use binrw::BinReaderExt;
-use models::{Keymap, ProfileKey};
+use models::{CherryKey, ProfileKey};
 use rgb::RGB8;
 use rusb::UsbContext;
 use serde_json::{self, Value};
-use std::{str::FromStr, time::Duration};
+use std::{
+    convert::TryInto,
+    str::FromStr,
+    time::Duration,
+};
 use thiserror::Error;
 
 // Re-exports
@@ -313,7 +317,7 @@ impl CherryKeyboard {
         Ok(())
     }
 
-    fn get_keymap(&self) -> Result<Vec<Keymap>, CherryRgbError> {
+    fn get_keymap(&self) -> Result<Vec<CherryKey>, CherryRgbError> {
         let mut buf: Vec<u8> = vec![];
 
         // 3 bytes per key are returned to reflect the keymap
@@ -335,10 +339,14 @@ impl CherryKeyboard {
 
         let keymap = buf
             .chunks(3)
-            .map(|x| Keymap {
-                modifier: x[0],
-                unk: x[1],
-                keycode: x[2],
+            .map(|x| {
+                let maybe_mod = x[0];
+                let keycode: u16 = (x[1] as u16) << 8 | x[2] as u16;
+
+                match keycode::KeyMapping::Usb(keycode).try_into() {
+                    Ok(x) => CherryKey::Parsed(x),
+                    Err(_) => CherryKey::Raw { maybe_mod, keycode },
+                }
             })
             .collect();
 
@@ -372,7 +380,7 @@ impl CherryKeyboard {
         self.start_transaction()?;
         self.send_payload(Payload::Unknown3 { unk: 0x22 })?;
         let keymap = self.get_keymap()?;
-        log::debug!("Keymap: {keymap:?}");
+        log::debug!("Keymap: {keymap:#?}");
         let key_indexes = self.get_key_indexes()?;
         log::debug!("Key indexes: {key_indexes:?}");
         self.end_transaction()?;
