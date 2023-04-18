@@ -7,7 +7,7 @@
 
 ## Compatibility
 
-To see which devices are tested take a look at the [Compatibility Table](COMPATIBILITY.md).
+To see which devices are tested take a look at the [Compatibility Table](./docs/COMPATIBILITY.md).
 
 ## Features
 
