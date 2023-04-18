@@ -222,17 +222,11 @@ impl CherryKeyboard {
 
         // Skip kernel driver detachment for non-unix platforms
         if cfg!(unix) {
-            let kernel_driver_active = device_handle
-                .kernel_driver_active(INTERFACE_NUM)
-                .map_err(|e| CherryRgbError::UsbError("kernel_driver_active".into(), e))?;
-
-            if kernel_driver_active {
-                device_handle
-                    .detach_kernel_driver(INTERFACE_NUM)
-                    .map_err(|e| {
-                        CherryRgbError::UsbError("Failed to detach active kernel driver".into(), e)
-                    })?;
-            }
+            device_handle
+                .set_auto_detach_kernel_driver(true)
+                .map_err(|e| {
+                    CherryRgbError::UsbError("Failed to detach active kernel driver".into(), e)
+                })?;
         }
 
         device_handle
