@@ -88,7 +88,7 @@ fn main() -> Result<()> {
     } else {
         log::Level::Info
     };
-    simple_logger::init_with_level(loglevel).unwrap();
+    simple_logger::init_with_level(loglevel)?;
 
     /* Fun begins */
     keyboard
@@ -127,10 +127,7 @@ fn main() -> Result<()> {
             keyboard.set_custom_colors(keys)?;
         }
         CliCommand::Animation(args) => {
-            let color = args
-                .color
-                .or_else(|| Some(rgb::RGB8::new(255, 255, 255).into()))
-                .unwrap();
+            let color = args.color.unwrap_or(rgb::RGB8::new(255, 255, 255).into());
 
             log::info!(
                 "Setting: mode={:?} brightness={:?} speed={:?} color={:?}",

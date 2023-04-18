@@ -75,12 +75,12 @@ impl BinWrite for OwnRGB8 {
 }
 
 impl FromStr for OwnRGB8 {
-    type Err = &'static str;
+    type Err = hex::FromHexError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let val = match s.len() {
             6 => {
-                let bytes = hex::decode(s).unwrap();
+                let bytes = hex::decode(s)?;
                 RGB8 {
                     r: bytes[0],
                     g: bytes[1],
@@ -89,7 +89,7 @@ impl FromStr for OwnRGB8 {
                 .into()
             }
             _ => {
-                return Err("Invalid hex string");
+                return Err(hex::FromHexError::InvalidStringLength);
             }
         };
 
