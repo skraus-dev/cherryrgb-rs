@@ -103,6 +103,8 @@ pub enum CherryRgbError {
     ParseError(String),
     #[error("Json Parsing Error")]
     JsonParseError(#[from] serde_json::Error),
+    #[error("Protocol error")]
+    ProtocolError(String),
 }
 
 /// Calculate packet checksum (index 1 in payload)
@@ -279,24 +281,18 @@ impl CherryKeyboard {
             .map_err(|err| CherryRgbError::UsbError("Interrupt read failure".into(), err))?;
 
         let resp_payload = std::io::Cursor::new(response).read_ne::<Packet<Payload>>();
-        let detail_info = {
-            match &resp_payload {
-                Ok(pkt) => format!("{:?} Checksum valid: {:?}", pkt, pkt.verify_checksum()),
-                Err(e) => format!("Failed to parse, err: {:?}", e),
-            }
+        let detail_info = match &resp_payload {
+            Ok(pkt) => format!("{:?} Checksum valid: {:?}", pkt, pkt.verify_checksum()),
+            Err(e) => format!("Failed to parse, err: {:?}", e),
         };
+
         log::debug!(
             "<< INTERRUPT TRANSFER {:?}\n<< {}\n",
             hex::encode(response),
             detail_info
         );
 
-        let res = match resp_payload {
-            Ok(pkt) => Some(pkt),
-            Err(_) => None,
-        };
-
-        Ok(res)
+        Ok(resp_payload.ok())
     }
 
     /// Start RGB setting transaction
@@ -313,54 +309,105 @@ impl CherryKeyboard {
         Ok(())
     }
 
-    fn get_keymap(&self) -> Result<Vec<Keymap>, CherryRgbError> {
-        let mut buf: Vec<u8> = vec![];
-
+    fn get_keymap(&self) -> Result<Vec<Option<Keymap>>, CherryRgbError> {
         // 3 bytes per key are returned to reflect the keymap
         let total_size = TOTAL_KEYS * 3;
-        for offset in (0..total_size).step_by(CHUNK_SIZE) {
-            let len = std::cmp::min(total_size - offset, CHUNK_SIZE);
 
-            let keys = self.send_payload(Payload::GetKeymap {
-                data_len: len as u8,
-                data_offset: offset as u16,
-                padding: 0,
-                keymap: vec![],
-            })?;
+        // Send requests and gather payloads
+        let packets: Vec<Result<Option<Packet<Payload>>, CherryRgbError>> = (0..total_size)
+            .step_by(CHUNK_SIZE)
+            .map(|offset| {
+                let len = std::cmp::min(total_size - offset, CHUNK_SIZE);
 
-            if let Payload::GetKeymap { keymap, .. } = keys.unwrap().payload() {
-                buf.extend(keymap);
-            }
-        }
-
-        let keymap = buf
-            .chunks(3)
-            .map(|x| Keymap {
-                modifier: x[0],
-                unk: x[1],
-                keycode: x[2],
+                self.send_payload(Payload::GetKeymap {
+                    data_len: len as u8,
+                    data_offset: offset as u16,
+                    padding: 0,
+                    keymap: vec![],
+                })
             })
             .collect();
 
-        Ok(keymap)
+        // Check if any of the requests errored out
+        if packets.iter().any(|res| res.is_err()) {
+            return Err(CherryRgbError::ProtocolError(
+                "GetKeymap received unexpected response(s)".into(),
+            ));
+        }
+
+        // Unwrap the data
+        let all_keys: Vec<Option<Keymap>> = packets
+            .into_iter()
+            .filter_map(|res| {
+                res.ok().unwrap_or(None).and_then(|inner| {
+                    if let Payload::GetKeymap { keymap, .. } = inner.payload() {
+                        Some(keymap.to_owned())
+                    } else {
+                        None
+                    }
+                })
+            })
+            .collect::<Vec<Vec<u8>>>()
+            .concat()
+            .chunks(3)
+            .map(|x| {
+                if x.len() != 3 {
+                    return None;
+                }
+
+                Some(Keymap {
+                    modifier: x[0],
+                    unk: x[1],
+                    keycode: x[2],
+                })
+            })
+            .collect();
+
+        Ok(all_keys)
     }
 
     fn get_key_indexes(&self) -> Result<Vec<u8>, CherryRgbError> {
-        let mut all_keys = vec![];
+        // Send requests and gather payloads
+        let packets: Vec<Result<Option<Packet<Payload>>, CherryRgbError>> = (0..TOTAL_KEYS)
+            .step_by(CHUNK_SIZE)
+            .map(|offset| {
+                let len = std::cmp::min(TOTAL_KEYS - offset, CHUNK_SIZE);
 
-        for offset in (0..TOTAL_KEYS).step_by(CHUNK_SIZE) {
-            let len = std::cmp::min(TOTAL_KEYS - offset, CHUNK_SIZE);
+                self.send_payload(Payload::GetKeyIndexes {
+                    data_len: len as u8,
+                    data_offset: offset as u16,
+                    padding: 0,
+                    key_data: vec![],
+                })
+            })
+            .collect();
 
-            let keys = self.send_payload(Payload::GetKeyIndexes {
-                data_len: len as u8,
-                data_offset: offset as u16,
-                padding: 0,
-                key_data: vec![],
-            })?;
+        // Check if any of the requests errored out
+        if packets.iter().any(|res| res.is_err()) {
+            return Err(CherryRgbError::ProtocolError(
+                "GetKeyIndexes received unexpected response(s)".into(),
+            ));
+        }
 
-            if let Payload::GetKeyIndexes { key_data, .. } = keys.unwrap().payload() {
-                all_keys.extend(key_data)
-            }
+        // Unwrap the data
+        let all_keys: Vec<u8> = packets
+            .into_iter()
+            .filter_map(|res| {
+                res.ok().unwrap_or(None).and_then(|inner| {
+                    if let Payload::GetKeyIndexes { key_data, .. } = inner.payload() {
+                        Some(key_data.to_owned())
+                    } else {
+                        None
+                    }
+                })
+            })
+            .collect::<Vec<Vec<u8>>>()
+            .concat();
+
+        if all_keys.len() != TOTAL_KEYS {
+            return Err(CherryRgbError::ProtocolError(
+                "Gathering of key indexes failed".into(),
+            ));
         }
 
         Ok(all_keys)
@@ -371,10 +418,17 @@ impl CherryKeyboard {
         log::trace!("Fetching device state - START");
         self.start_transaction()?;
         self.send_payload(Payload::Unknown3 { unk: 0x22 })?;
-        let keymap = self.get_keymap()?;
-        log::debug!("Keymap: {keymap:?}");
-        let key_indexes = self.get_key_indexes()?;
-        log::debug!("Key indexes: {key_indexes:?}");
+
+        match self.get_keymap() {
+            Ok(res) => log::debug!("Key indexes: {res:#?}"),
+            Err(err) => log::warn!("Fetching keymap failed, err={}", err),
+        }
+
+        match self.get_key_indexes() {
+            Ok(res) => log::debug!("Key indexes: {res:?}"),
+            Err(err) => log::warn!("Fetching Key Indexes failed, err={}", err),
+        };
+
         self.end_transaction()?;
         log::trace!("Fetching device state - END");
         Ok(())
