@@ -78,8 +78,8 @@ jobs:
 
           cp target/${{ matrix.job.target }}/release/$BINARY_NAME release_tmp/
           cp README.md release_tmp/
-          cp COMPATIBILITY.md release_tmp/
           cp LICENSE release_tmp/
+          cp ./docs/COMPATIBILITY.md release_tmp/
 
           ###### For linux builds, copy the udev directory too ######
           if [[ ${{ matrix.job.os-name }} == linux ]]; then
