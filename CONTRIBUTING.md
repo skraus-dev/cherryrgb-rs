@@ -20,3 +20,13 @@ that you did not break anything. Check for common code anti-pattern via `cargo c
 
 - For creating commit messages, please refer to [conventionalcommits](https://www.conventionalcommits.org/en/v1.0.0/)
 - When opening a PR, please use the provided Pull request template
+
+## Respect the copyright
+
+As this is a project based on reverse-engineered work, I feel this needs to be mentioned.
+Please do not upload possibly copyrighted material directly into the repository.
+
+Rather reference the original binary URL and steps how to acquire the target file from
+it (e.g. by extraction or local modification of the binary).
+
+An example of that can be seen in [RESEARCH.md](./RESEARCH.md).
