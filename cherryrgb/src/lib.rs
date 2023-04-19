@@ -56,19 +56,20 @@ mod extensions;
 mod models;
 
 use binrw::BinReaderExt;
+use hidapi::HidApi;
 use models::{Keymap, ProfileKey};
 use rgb::RGB8;
-use rusb::UsbContext;
+// use rusb::UsbContext;
 use serde_json::{self, Value};
-use std::{str::FromStr, time::Duration};
+use std::str::FromStr;
 use thiserror::Error;
 
 // Re-exports
 pub use extensions::{OwnRGB8, ToVec};
 pub use hex;
+pub use hidapi;
 pub use models::{Brightness, CustomKeyLeds, LightingMode, Packet, Payload, Speed};
 pub use rgb;
-pub use rusb;
 pub use strum;
 
 // Constants
@@ -76,8 +77,7 @@ pub use strum;
 pub const CHERRY_USB_VID: u16 = 0x046a;
 
 const INTERFACE_NUM: u8 = 1;
-const INTERRUPT_EP: u8 = 0x82;
-static TIMEOUT: Duration = Duration::from_millis(1000);
+const USAGE_PAGE: u16 = 0xFF1C; // 65308
 
 /// (64 byte packet - 4 byte packet header - 4 byte payload header)
 const CHUNK_SIZE: usize = 56;
@@ -88,9 +88,9 @@ pub enum CherryRgbError {
     #[error("Invalid argument")]
     InvalidArgument(String, String),
     #[error("USB Error")]
-    GeneralUsbError(#[from] rusb::Error),
+    GeneralUsbError(#[from] hidapi::HidError),
     #[error("USB Error, detail={0}")]
-    UsbError(String, rusb::Error),
+    UsbError(String, hidapi::HidError),
     #[error("Checksum error")]
     ChecksumError {
         calculated: u16,
@@ -130,14 +130,18 @@ fn is_supported(product_id: u16) -> bool {
 
 /// Find supported Cherry USB keyboards and return collection of (vendor_id, product_id)
 pub fn find_devices(product_id: Option<u16>) -> Result<Vec<(u16, u16)>, CherryRgbError> {
-    let devices = rusb::devices()?;
     // Search usb devices with VENDOR_ID of Cherry GmbH
     // If product_id is provided, filter for it too
-    let usb_ids: Vec<(u16, u16)> = devices
-        .iter()
-        .map(|dev| dev.device_descriptor().unwrap())
-        .filter(|desc| desc.vendor_id() == CHERRY_USB_VID)
-        .filter(|desc| is_supported(desc.product_id()))
+    let api = HidApi::new()?;
+
+    let usb_ids: Vec<(u16, u16)> = api
+        .device_list()
+        .filter(|desc| {
+            desc.vendor_id() == CHERRY_USB_VID
+                && desc.interface_number() == INTERFACE_NUM as i32
+                && desc.usage_page() == USAGE_PAGE
+                && is_supported(desc.product_id())
+        })
         .filter(|desc| match product_id {
             Some(prod_id) => desc.product_id() == prod_id,
             None => true,
@@ -188,52 +192,27 @@ pub fn read_color_profile(color_profile: &str) -> Result<Vec<ProfileKey>, Cherry
 
 /// Holds a handle to the USB keyboard device
 pub struct CherryKeyboard {
-    device_handle: rusb::DeviceHandle<rusb::Context>,
+    device_handle: hidapi::HidDevice,
 }
 
 impl CherryKeyboard {
     /// Init USB device by verifying number of configurations and claiming appropriate interface
     pub fn new(vendor_id: u16, product_id: u16) -> Result<Self, CherryRgbError> {
-        let ctx = rusb::Context::new()?;
+        let ctx = HidApi::new()?;
 
-        let mut device_handle = ctx
-            .open_device_with_vid_pid(vendor_id, product_id)
-            .ok_or_else(|| CherryRgbError::DeviceNotFoundError)?;
+        let device = ctx
+            .device_list()
+            .find(|d| {
+                d.vendor_id() == vendor_id
+                    && d.product_id() == product_id
+                    && d.interface_number() == INTERFACE_NUM as i32
+                    && d.usage_page() == USAGE_PAGE
+            })
+            .ok_or(CherryRgbError::DeviceNotFoundError)?;
 
-        let device = device_handle.device();
-        let device_desc = device
-            .device_descriptor()
-            .map_err(|e| CherryRgbError::UsbError("Failed to read device descriptor".into(), e))?;
-
-        let config_desc = device
-            .active_config_descriptor()
-            .map_err(|e| CherryRgbError::UsbError("Failed to get config descriptor".into(), e))?;
-
-        log::debug!(
-            "* Connected to: Bus {:03} Device {:03} ID {:04x}:{:04x}",
-            device.bus_number(),
-            device.address(),
-            device_desc.vendor_id(),
-            device_desc.product_id()
-        );
-
-        assert_eq!(device_desc.num_configurations(), 1);
-        assert_eq!(config_desc.num_interfaces(), 2);
-
-        // Skip kernel driver detachment for non-unix platforms
-        if cfg!(unix) {
-            device_handle
-                .set_auto_detach_kernel_driver(true)
-                .map_err(|e| {
-                    CherryRgbError::UsbError("Failed to detach active kernel driver".into(), e)
-                })?;
-        }
-
-        device_handle
-            .claim_interface(INTERFACE_NUM)
-            .map_err(|e| CherryRgbError::UsbError("Failed to claim interface".into(), e))?;
-
-        Ok(Self { device_handle })
+        Ok(Self {
+            device_handle: device.open_device(&ctx)?,
+        })
     }
 
     /// Writes a control packet first, then reads interrupt packet
@@ -246,19 +225,8 @@ impl CherryKeyboard {
 
         let mut response = [0u8; 64];
         self.device_handle
-            .write_control(
-                rusb::request_type(
-                    rusb::Direction::Out,
-                    rusb::RequestType::Class,
-                    rusb::Recipient::Interface,
-                ),
-                0x09,          // Request - SET_REPORT
-                0x0204,        // Value - ReportId: 4, ReportType: Output
-                0x0001,        // Index
-                &packet_bytes, // Data
-                TIMEOUT,
-            )
-            .map_err(|err| CherryRgbError::UsbError("Control Write failure".into(), err))?;
+            .write(&packet_bytes)
+            .map_err(|e| CherryRgbError::UsbError("Failed writing".into(), e))?;
 
         log::debug!(
             ">> CONTROL TRANSFER {:?}\n>> {:?}\n",
@@ -266,15 +234,12 @@ impl CherryKeyboard {
             packet,
         );
 
-        self.device_handle
-            .read_interrupt(
-                INTERRUPT_EP,  // Endpoint
-                &mut response, // read buffer
-                TIMEOUT,
-            )
-            .map_err(|err| CherryRgbError::UsbError("Interrupt read failure".into(), err))?;
+        let _size_read = self
+            .device_handle
+            .read(&mut response)
+            .map_err(|e| CherryRgbError::UsbError("Failed reading".into(), e))?;
 
-        let resp_payload = std::io::Cursor::new(response).read_ne::<Packet<Payload>>();
+        let resp_payload = std::io::Cursor::new(&response).read_ne::<Packet<Payload>>();
         let detail_info = match &resp_payload {
             Ok(pkt) => format!("{:?} Checksum valid: {:?}", pkt, pkt.verify_checksum()),
             Err(e) => format!("Failed to parse, err: {:?}", e),
