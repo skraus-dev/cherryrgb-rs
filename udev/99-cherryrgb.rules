@@ -1,1 +1,13 @@
+######################################
+# udev rule for Cherry RGB keyboards #
+######################################
+
 SUBSYSTEMS=="usb", ATTR{idVendor}=="046a", ATTR{idProduct}=="*", MODE="0666"
+
+# There is a known bug in the keyboard firmware that produces loads of keyevents
+# and makes the input go very sluggish / prevent logins over TTY
+#
+# Reference: https://bbs.archlinux.org/viewtopic.php?id=267365
+#
+# Uncomment the following line to workaround this issue
+# ACTION=="add", SUBSYSTEM=="input", ATTRS{idVendor}=="046a", ATTRS{idProduct}=="*", ATTR{capabilities/ev}=="10001f", ATTR{inhibited}="1"
