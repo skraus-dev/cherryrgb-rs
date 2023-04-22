@@ -5,6 +5,7 @@ use crate::{
 };
 
 use binrw::{binrw, until_eof, BinRead, BinWrite, BinWriterExt};
+use serde::{Deserialize, Serialize};
 use std::convert::TryFrom;
 use strum_macros::{EnumString, EnumVariantNames};
 
@@ -13,7 +14,7 @@ use strum_macros::{EnumString, EnumVariantNames};
 /// -> S: Speed
 #[binrw]
 #[brw(repr = u8)]
-#[derive(Clone, Eq, PartialEq, Debug, EnumString, EnumVariantNames)]
+#[derive(Clone, Eq, PartialEq, Debug, EnumString, EnumVariantNames, Serialize, Deserialize)]
 #[strum(serialize_all = "snake_case")]
 pub enum LightingMode {
     Wave = 0x00,      // CS
@@ -39,7 +40,7 @@ pub enum LightingMode {
 /// Just defined here for completeness' sake
 #[binrw]
 #[brw(repr = u8)]
-#[derive(Eq, PartialEq, Debug)]
+#[derive(Eq, PartialEq, Debug, Serialize, Deserialize)]
 pub enum UsbPollingRate {
     Low,    // 125Hz
     Medium, // 250 Hz
@@ -50,7 +51,7 @@ pub enum UsbPollingRate {
 /// LED animation speed
 #[binrw]
 #[brw(repr = u8)]
-#[derive(Clone, Eq, PartialEq, Debug, EnumString, EnumVariantNames)]
+#[derive(Clone, Eq, PartialEq, Debug, EnumString, EnumVariantNames, Serialize, Deserialize)]
 #[strum(serialize_all = "snake_case")]
 pub enum Speed {
     VeryFast = 0,
@@ -63,7 +64,7 @@ pub enum Speed {
 /// LED brightness
 #[binrw]
 #[brw(repr = u8)]
-#[derive(Clone, Eq, PartialEq, Debug, EnumString, EnumVariantNames)]
+#[derive(Clone, Eq, PartialEq, Debug, EnumString, EnumVariantNames, Serialize, Deserialize)]
 #[strum(serialize_all = "snake_case")]
 pub enum Brightness {
     Off = 0,
@@ -209,7 +210,7 @@ where
 }
 
 /// Wrapper around custom LED color for all keys
-#[derive(Default, Debug)]
+#[derive(Default, Debug, Serialize, Deserialize)]
 pub struct CustomKeyLeds {
     key_leds: Vec<OwnRGB8>,
 }
@@ -319,4 +320,14 @@ impl CustomKeyLeds {
 
         Ok(result)
     }
+}
+
+/// Parameters for set_led_animation
+#[derive(Debug, Serialize, Deserialize)]
+pub struct RpcAnimation {
+    pub mode: LightingMode,
+    pub brightness: Brightness,
+    pub speed: Speed,
+    pub color: Option<OwnRGB8>,
+    pub rainbow: bool,
 }

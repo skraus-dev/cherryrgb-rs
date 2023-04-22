@@ -1,0 +1,12 @@
+# Configuration for cherryrgb.service
+#
+# Possible cmdline options. Shown values are defaults
+#
+# --socket /run/cherryrgb.sock
+# --socketmode 0664
+# --socketgroup root
+# --product-id <None>
+#
+# run cherryrgb_service -h for more info
+#
+CHERRYRGB_OPTIONS="--socketgroup wheel"

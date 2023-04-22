@@ -1,0 +1,12 @@
+[Unit]
+Description = CherryRGB UHID daemon
+
+[Service]
+EnvironmentFile = -/etc/default/cherryrgb
+ExecStart = /usr/libexec/cherryrgb_service $CHERRYRGB_OPTIONS
+Restart = on-abort
+StartLimitInterval = 60
+StartLimitBurst = 10
+
+[Install]
+WantedBy = multi-user.target

@@ -1,20 +1,15 @@
 [package]
-name = "cherryrgb_cli"
-version = "0.2.4"
+name = "cherryrgb_ncli"
+version = "0.2.3"
 edition = "2018"
 publish = false
 
-[workspace]
-members = [
-    "service",
-    "ncli",
-]
-
 [dependencies]
-cherryrgb = { path = "cherryrgb" }
+cherryrgb = { path = "../cherryrgb" }
 anyhow = "1.0"
 structopt = "0.3"
 log = "0.4"
+serde_json = "1.0.96"
 
 [dependencies.simple_logger]
 version = "1.13"

@@ -12,8 +12,10 @@ thiserror = "1"
 binrw = "0.8"
 hex = "0.4"
 log = "0.4"
-rgb = "0.8"
+rgb = { version = "0.8", features = ["serde"] }
 rusb = "0.9"
+serde = { version = "1.0.160", features = ["derive"] }
 strum = "0.24.1"
 strum_macros = "0.24.3"
 serde_json = "1.0"
+uhid-virt = "0.0.5"
