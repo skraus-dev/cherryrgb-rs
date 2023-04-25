@@ -775,9 +775,8 @@ checksum = "497961ef93d974e23eb6f433eb5fe1b7930b659f06d12dec6fc44a8f554c0bba"
 
 [[package]]
 name = "uhid-virt"
-version = "0.0.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7e317bfbb0281bb799f4802d62261a798443a88df4352f302269ad32b4cfc822"
+version = "0.0.4"
+source = "git+https://github.com/felfert/uhid-virt.git#9cb5f6f4277521b9fe784bc8b2caf6b73ca7dc31"
 dependencies = [
  "enumflags2",
  "libc",
