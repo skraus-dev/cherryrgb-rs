@@ -145,6 +145,14 @@ This project is not affiliated or endorsed by Cherry GmbH.
 
 ## Changelog
 
+### v0.2.4 - 25/04/2023
+
+* lib: Rework fetch_device_state to use GetKeymap and GetKeyIndexes
+* lib: Use thiserror, deprecate anyhow
+* lib: Re-export strum-crate
+* lib: Implement auto kernel-driver handling (detach / attach) (by @felfert)
+* README/udev: Add workaround for sluggish keyevents via udev; however it makes special keys not work
+
 ### v0.2.3 - 15/04/2023
 
 * cli: Init logger before sending first packets
