@@ -82,7 +82,7 @@ checksum = "baf1de4339761588bc0619e3cbc0120ee582ebb74b53b4efbf79117bd2da40fd"
 
 [[package]]
 name = "cherryrgb"
-version = "0.2.3"
+version = "0.2.4"
 dependencies = [
  "binrw",
  "hex",
@@ -97,7 +97,7 @@ dependencies = [
 
 [[package]]
 name = "cherryrgb_cli"
-version = "0.2.3"
+version = "0.2.4"
 dependencies = [
  "anyhow",
  "cherryrgb",
