@@ -52,10 +52,6 @@ struct Opt {
     #[structopt(short, long)]
     debug: bool,
 
-    /*
-    #[structopt(long)]
-    product_id: Option<u16>,
-    */
     #[structopt(
         name = "socket",
         long,

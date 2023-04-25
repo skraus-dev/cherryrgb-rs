@@ -1,6 +1,7 @@
 use anyhow::{anyhow, Context, Result};
 use cherryrgb::{self, CherryKeyboard, CustomKeyLeds, RpcAnimation, VirtKbd};
 use file_mode::ModePath;
+use log::LevelFilter;
 use nix::unistd::{chown, Group};
 use std::io::Read;
 use std::os::unix::net::{UnixListener, UnixStream};
@@ -9,6 +10,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::{thread, time};
 use structopt::StructOpt;
+use systemd_journal_logger::{connected_to_journal, init_with_extra_fields};
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 const NAME: &str = env!("CARGO_PKG_NAME");
@@ -192,12 +194,24 @@ fn get_u16_from_string(pid: Option<String>) -> Option<u16> {
 fn main() -> Result<()> {
     let opt = Opt::from_args();
 
-    let loglevel = if opt.debug {
-        log::Level::Debug
+    if connected_to_journal() {
+        // If the output streams of this process are directly connected to the
+        // systemd journal log directly to the journal to preserve structured
+        // log entries (e.g. proper multiline messages, metadata fields, etc.)
+        init_with_extra_fields(vec![("VERSION", VERSION)]).unwrap();
+        if opt.debug {
+            log::set_max_level(LevelFilter::Debug);
+        } else {
+            log::set_max_level(LevelFilter::Info);
+        }
     } else {
-        log::Level::Info
-    };
-    simple_logger::init_with_level(loglevel)?;
+        let loglevel = if opt.debug {
+            log::Level::Debug
+        } else {
+            log::Level::Info
+        };
+        simple_logger::init_with_level(loglevel)?;
+    }
     log::info!("{} {} starting", NAME, VERSION);
 
     let running = Arc::new(AtomicBool::new(true));
