@@ -43,6 +43,9 @@ Get usage help
 ./cherryrgb_cli animation --help
 ./cherryrgb_cli custom-colors --help
 ```
+### Alternative CLI and service for Linux
+
+See [this](docs/UHID-driver.md) doc.
 
 ### Set LED animation
 
@@ -135,8 +138,8 @@ This is a known issue in the keyboard firmware.
 It is mentioned here: <https://bbs.archlinux.org/viewtopic.php?id=267365>
 
 - **Proper** way to fix it: **Contact Cherry Support**
-
 - **Workaround**: Comment out the respective line in [`99-cherryrgb.rules`](https://github.com/skraus-dev/cherryrgb-rs/blob/master/udev/99-cherryrgb.rules) and reload/trigger the udev rule.
+- See [this](docs/UHID-driver.md) doc for an alternative solution on Linux.
 
 ## Disclaimer
 
