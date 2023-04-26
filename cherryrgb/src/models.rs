@@ -7,32 +7,52 @@ use crate::{
 use binrw::{binrw, until_eof, BinRead, BinWrite, BinWriterExt};
 use serde::{Deserialize, Serialize};
 use std::convert::TryFrom;
-use strum_macros::{EnumString, EnumVariantNames};
+use strum_macros::{EnumProperty, EnumString, EnumVariantNames};
 
-/// Modes support:
-/// -> C: Color
-/// -> S: Speed
+/// Mode attributes:
+/// -> C: Supports color option
+/// -> S: Supports speed option
+/// -> U: Unofficial
 #[binrw]
 #[brw(repr = u8)]
-#[derive(Clone, Eq, PartialEq, Debug, EnumString, EnumVariantNames, Serialize, Deserialize)]
+#[derive(
+    Clone, Eq, PartialEq, Debug, EnumString, EnumProperty, EnumVariantNames, Serialize, Deserialize,
+)]
 #[strum(serialize_all = "snake_case")]
 pub enum LightingMode {
-    Wave = 0x00,      // CS
-    Spectrum = 0x01,  // S
+    #[strum(props(attr = "CS"))]
+    Wave = 0x00, // CS
+    #[strum(props(attr = "S"))]
+    Spectrum = 0x01, // S
+    #[strum(props(attr = "CS"))]
     Breathing = 0x02, // CS
-    Static = 0x03,    // n/A
-    Radar = 0x04,     // Unofficial
-    Vortex = 0x05,    // Unofficial
-    Fire = 0x06,      // Unofficial
-    Stars = 0x07,     // Unofficial
-    Rain = 0x0B,      // Unofficial (looks like Matrix :D)
+    #[strum(props(attr = "C"))]
+    Static = 0x03, // C
+    #[strum(props(attr = "U"))]
+    Radar = 0x04, // Unofficial
+    #[strum(props(attr = "U"))]
+    Vortex = 0x05, // Unofficial
+    #[strum(props(attr = "U"))]
+    Fire = 0x06, // Unofficial
+    #[strum(props(attr = "U"))]
+    Stars = 0x07, // Unofficial
+    #[strum(props(attr = "U"))]
+    Rain = 0x0B, // Unofficial (looks like Matrix :D)
+    #[strum(props(attr = ""))]
     Custom = 0x08,
-    Rolling = 0x0A,   // S
-    Curve = 0x0C,     // CS
-    WaveMid = 0x0E,   // Unoffical
-    Scan = 0x0F,      // C
+    #[strum(props(attr = "S"))]
+    Rolling = 0x0A, // S
+    #[strum(props(attr = "CS"))]
+    Curve = 0x0C, // CS
+    #[strum(props(attr = "yes"))]
+    WaveMid = 0x0E, // Unofficial
+    #[strum(props(attr = "C"))]
+    Scan = 0x0F, // C
+    #[strum(props(attr = "CS"))]
     Radiation = 0x12, // CS
-    Ripples = 0x13,   // CS
+    #[strum(props(attr = "CS"))]
+    Ripples = 0x13, // CS
+    #[strum(props(attr = "CS"))]
     SingleKey = 0x15, // CS
 }
 
@@ -322,7 +342,8 @@ impl CustomKeyLeds {
     }
 }
 
-/// Parameters for set_led_animation
+/// Parameters for set_led_animation (sent serialized from
+/// cherryrgb_ncli to cherryrgb_service).
 #[derive(Debug, Serialize, Deserialize)]
 pub struct RpcAnimation {
     pub mode: LightingMode,
