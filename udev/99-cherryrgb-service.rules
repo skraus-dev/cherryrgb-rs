@@ -1,16 +1,7 @@
 ######################################
-# udev rule for Cherry RGB keyboards #
+# udev rule for Cherry RGB service   #
 ######################################
 
-# The following line enables access to the Cherry keyboard device for all users
-# It is necessary, when you want to use cherryrgb_cli as ordinary user.
-# It is NOT necessary, if you use the cherryrgb_service which runs as root
-SUBSYSTEMS=="usb", ATTR{idVendor}=="046a", ATTR{idProduct}=="*", MODE="0666"
-
-# There is a known bug in the keyboard firmware that produces loads of keyevents
-# and makes the input go very sluggish / prevent logins over TTY
-#
-# Reference: https://bbs.archlinux.org/viewtopic.php?id=267365
-#
-# Uncomment the following line to workaround this issue
-# ACTION=="add", SUBSYSTEM=="input", ATTRS{idVendor}=="046a", ATTRS{idProduct}=="*", ATTR{capabilities/ev}=="10001f", ATTR{inhibited}="1"
+# Uncomment the following line to restart the cheeryrgb_service whenever a Cherry keyboard is plugged in.
+# You might need to adapt the absolute path to /usr/bin/systemctl if it is at a different location on your system
+ACTION=="add" SUBSYSTEMS=="usb", ATTR{idVendor}=="046a", ATTR{idProduct}=="*", RUN+="/usr/bin/systemctl restart cherryrgb.service"
