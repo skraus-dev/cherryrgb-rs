@@ -3,7 +3,7 @@ use cherryrgb::{self, CherryKeyboard, CustomKeyLeds, RpcAnimation, VirtKbd};
 use file_mode::ModePath;
 use log::LevelFilter;
 use nix::unistd::{chown, Group};
-use std::io::Read;
+use std::io::{Read, Write};
 use std::os::unix::net::{UnixListener, UnixStream};
 use std::path::Path;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -53,6 +53,10 @@ struct Opt {
     socket_group: String,
 }
 
+/// Handle a single connection from cherryrgb_ncli
+/// Try to read command (and possible
+/// serialized parameters) from stream, then
+/// execute command and return the result.
 fn handle_client(
     mut stream: UnixStream,
     keyboard: Arc<CherryKeyboard>,
@@ -66,12 +70,42 @@ fn handle_client(
             return Ok(());
         }
     };
+    if msg.starts_with("debug=on") {
+        log::set_max_level(LevelFilter::Debug);
+        return Ok(());
+    }
+    if msg.starts_with("debug=off") {
+        log::set_max_level(LevelFilter::Info);
+        return Ok(());
+    }
+    // Not really useful at the moment, because
+    // it just does logging, always returns an
+    // empty Ok Result and is not really required
+    // for LED-related operations.
+    /*
+    if msg.starts_with("fetch_device_state") {
+        let _guard = mutex.lock().unwrap();
+        match keyboard.fetch_device_state() {
+            Ok(res) => res,
+            Err(err) => {
+                let emsg = format!("Fetching device state failed: {:?}", err);
+                let _ = stream.write_all(emsg.as_bytes());
+                _ = stream.flush();
+                log::error!("{}", emsg);
+                return Ok(());
+            }
+        }
+        return Ok(());
+    }
+    */
     if msg.starts_with("reset_custom_colors") {
         let _guard = mutex.lock().unwrap();
         match keyboard.reset_custom_colors() {
             Ok(res) => res,
             Err(err) => {
-                log::error!("Errror in reset_custom_colors: {:?}", err);
+                let emsg = format!("Errror in reset_custom_colors: {:?}", err);
+                let _ = stream.write_all(format!("{}\n", emsg).as_bytes());
+                log::error!("{}", emsg);
                 return Ok(());
             }
         }
@@ -100,7 +134,9 @@ fn handle_client(
         ) {
             Ok(res) => res,
             Err(err) => {
-                log::error!("Errror in set_led_animation: {:?}", err);
+                let emsg = format!("Errror in set_led_animation: {:?}", err);
+                let _ = stream.write_all(emsg.as_bytes());
+                log::error!("{}", emsg);
                 return Ok(());
             }
         }
@@ -122,18 +158,15 @@ fn handle_client(
         match keyboard.set_custom_colors(key_leds) {
             Ok(res) => res,
             Err(err) => {
-                log::error!("Errror in set_set_custom_colors: {:?}", err);
+                let emsg = format!("Errror in set_set_custom_colors: {:?}", err);
+                let _ = stream.write_all(emsg.as_bytes());
+                log::error!("{}", emsg);
                 return Ok(());
             }
         }
         return Ok(());
     }
     log::warn!("received invalid cmd: {:?}", msg.as_str().trim());
-    /* Not really needed (at least for MX 10.0 N) ?
-    keyboard
-        .fetch_device_state()
-        .context("Fetching device state failed")?;
-        */
     Ok(())
 }
 
@@ -199,18 +232,13 @@ fn main() -> Result<()> {
         // systemd journal log directly to the journal to preserve structured
         // log entries (e.g. proper multiline messages, metadata fields, etc.)
         init_with_extra_fields(vec![("VERSION", VERSION)]).unwrap();
-        if opt.debug {
-            log::set_max_level(LevelFilter::Debug);
-        } else {
-            log::set_max_level(LevelFilter::Info);
-        }
     } else {
-        let loglevel = if opt.debug {
-            log::Level::Debug
-        } else {
-            log::Level::Info
-        };
-        simple_logger::init_with_level(loglevel)?;
+        simple_logger::init()?;
+    }
+    if opt.debug {
+        log::set_max_level(LevelFilter::Debug);
+    } else {
+        log::set_max_level(LevelFilter::Info);
     }
     log::info!("{} {} starting", NAME, VERSION);
 

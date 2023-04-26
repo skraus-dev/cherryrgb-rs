@@ -135,7 +135,8 @@ impl VirtKbd {
         }
     }
 
-    /// Forward a single HID event
+    /// Forward a single HID event.
+    /// See: CherryKeyboard::forward_filtered_keys()
     pub fn forward(&mut self, input: &[u8]) {
         self.device.write(input).unwrap();
     }
