@@ -222,6 +222,7 @@ fn main() -> Result<()> {
     .expect("Error setting Ctrl-C handler");
 
     let aopt = Arc::new(opt.clone());
+    // Mutex for accessing CherryKeyboard
     let amutex = Arc::new(Mutex::new(0));
 
     // Allow the usual hex specifiation (starting with 0x) for the product-id
