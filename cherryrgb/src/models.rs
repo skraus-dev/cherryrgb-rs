@@ -344,6 +344,7 @@ impl CustomKeyLeds {
 
 /// Parameters for set_led_animation (sent serialized from
 /// cherryrgb_ncli to cherryrgb_service).
+#[cfg(all(target_os = "linux", target_arch = "x86_64"))]
 #[derive(Debug, Serialize, Deserialize)]
 pub struct RpcAnimation {
     pub mode: LightingMode,

@@ -54,6 +54,7 @@
 
 mod extensions;
 mod models;
+#[cfg(all(target_os = "linux", target_arch = "x86_64"))]
 mod vkbd;
 
 use binrw::BinReaderExt;
@@ -67,11 +68,13 @@ use thiserror::Error;
 // Re-exports
 pub use extensions::{OwnRGB8, ToVec};
 pub use hex;
+#[cfg(all(target_os = "linux", target_arch = "x86_64"))]
 pub use models::RpcAnimation;
 pub use models::{Brightness, CustomKeyLeds, LightingMode, Packet, Payload, Speed};
 pub use rgb;
 pub use rusb;
 pub use strum;
+#[cfg(all(target_os = "linux", target_arch = "x86_64"))]
 pub use vkbd::VirtKbd;
 
 // Constants
@@ -81,6 +84,7 @@ pub const CHERRY_USB_VID: u16 = 0x046a;
 const INTERFACE_NUM: u8 = 1;
 const INTERRUPT_EP: u8 = 0x82;
 static TIMEOUT: Duration = Duration::from_millis(1000);
+#[cfg(all(target_os = "linux", target_arch = "x86_64"))]
 static SHORT_TIMEOUT: Duration = Duration::from_millis(100);
 
 /// (64 byte packet - 4 byte packet header - 4 byte payload header)
@@ -432,6 +436,7 @@ impl CherryKeyboard {
 
     /// forward a key event from our usb device to the virtual UHID keyboard,
     /// filter out any bogus events while doing so.
+    #[cfg(all(target_os = "linux", target_arch = "x86_64"))]
     pub fn forward_filtered_keys(&self, vdevice: &mut VirtKbd) -> Result<(), CherryRgbError> {
         let mut buf = [0; 64];
         match self

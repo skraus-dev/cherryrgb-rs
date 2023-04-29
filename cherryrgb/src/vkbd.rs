@@ -1,3 +1,5 @@
+#![cfg(all(target_os = "linux", target_arch = "x86_64"))]
+
 use log::error;
 use uhid_virt::{Bus, CreateParams, UHIDDevice};
 
