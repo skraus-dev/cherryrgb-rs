@@ -7,6 +7,9 @@ repository = "https://github.com/skraus-dev/cherryrgb-rs"
 license = "MIT"
 homepage = "https://github.com/skraus-dev/cherryrgb-rs"
 
+[features]
+uhid = ["dep:uhid-virt"]
+
 [dependencies]
 thiserror = "1"
 binrw = "0.8"
@@ -19,5 +22,5 @@ strum = "0.24.1"
 strum_macros = "0.24.3"
 serde_json = "1.0"
 
-[target.'cfg(all(target_os = "linux", target_arch = "x86_64"))'.dependencies]
-uhid-virt = "0.0.6"
+[target.'cfg(all(target_os = "linux"))'.dependencies]
+uhid-virt = { version = "0.0.6", optional = true }

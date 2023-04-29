@@ -4,11 +4,19 @@ version = "0.2.4"
 edition = "2018"
 publish = false
 
+[features]
+uhid = ["cherryrgb/uhid"]
+
 [workspace]
 members = [
     "service",
     "ncli",
 ]
+
+[workspace.package]
+version = "0.2.4"
+edition = "2018"
+publish = false
 
 [dependencies]
 cherryrgb = { path = "cherryrgb" }
