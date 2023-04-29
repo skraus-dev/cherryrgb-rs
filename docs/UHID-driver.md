@@ -6,9 +6,9 @@ The UHID feature is available **on Linux only**.
 The motivation for this new was [this issue](https://github.com/skraus-dev/cherryrgb-rs/issues/22).
 
 ### How to build
-In order to build everything, you now must use the ``--all`` flag
+In order to build everything, you now must use the ``--all`` flag and enable the feature ``uhid``
 when building. E.g.:
-``cargo build --all``
+``cargo build --all --features uhid``
 This creates 2 new binaries ``cherryrgb_service`` and ``cherryrgb_ncli``.
 
 The service should run as root and provides the UHID driver as well as socket server, listening on ``/run/cherryrgb.sock`` by default.
