@@ -5,6 +5,10 @@ on:
     branches: [master]
   pull_request:
 
+env:
+  CARGO_TERM_COLOR: always
+  INSTALLDEPS: "sudo apt-get update && sudo DEBIAN_FRONTEND=noninteractive apt-get install -y libclang-dev clang llvm"
+
 jobs:
 
   test:
@@ -13,6 +17,8 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
+      - name: Install build dependencies
+        run: ${{ env.INSTALLDEPS }}
       - uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: stable
@@ -37,6 +43,8 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
+      - name: Install build dependencies
+        run: ${{ env.INSTALLDEPS }}
       - uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: stable
@@ -50,6 +58,8 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
+      - name: Install build dependencies
+        run: ${{ env.INSTALLDEPS }}
       - uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: stable

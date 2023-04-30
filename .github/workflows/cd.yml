@@ -3,6 +3,10 @@ name: CD # Continuous Deployment
 on:
   push:
 
+env:
+  CARGO_TERM_COLOR: always
+  INSTALLDEPS: "sudo apt-get update && sudo DEBIAN_FRONTEND=noninteractive apt-get install -y libclang-dev clang llvm"
+
 jobs:
 
   publish:
@@ -20,6 +24,8 @@ jobs:
             binary-postfix: ""
             use-cross: false
             cargo-command: cargo
+            buildopts: ""
+            install-builddeps = false
           - os: ubuntu-latest
             os-name: linux
             target: x86_64-unknown-linux-gnu
@@ -27,6 +33,8 @@ jobs:
             binary-postfix: ""
             use-cross: false
             cargo-command: cargo
+            buildopts: "--all --features uhid"
+            install-builddeps = true
           - os: windows-latest
             os-name: windows
             target: x86_64-pc-windows-msvc
@@ -34,6 +42,8 @@ jobs:
             binary-postfix: ".exe"
             use-cross: false
             cargo-command: cargo
+            buildopts: ""
+            install-builddeps = false
           - os: ubuntu-latest
             os-name: linux
             target: aarch64-unknown-linux-gnu
@@ -41,6 +51,8 @@ jobs:
             binary-postfix: ""
             use-cross: true
             cargo-command: cross
+            buildopts: ""
+            install-builddeps = false
           - os: ubuntu-latest
             os-name: linux
             target: i686-unknown-linux-gnu
@@ -48,6 +60,8 @@ jobs:
             binary-postfix: ""
             use-cross: true
             cargo-command: cross
+            buildopts: ""
+            install-builddeps = false
 
     steps:
       - name: Checkout repository
@@ -58,9 +72,12 @@ jobs:
       - name: Install cross
         if: ${{ matrix.job.use-cross }}
         run: cargo install cross
+      - name: Install build dependencies
+        if: ${{ matrix.job.install-builddeps }}
+        run: ${{ env.INSTALLDEPS }}
 
       - name: Cargo build
-        run: ${{ matrix.job.cargo-command }} build --release --target ${{ matrix.job.target }} --all
+        run: ${{ matrix.job.cargo-command }} build --release --target ${{ matrix.job.target }} ${{ matrix.job.buildopts }}
 
       - name: install strip command
         shell: bash
