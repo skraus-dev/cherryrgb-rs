@@ -1,0 +1,9 @@
+[Unit]
+Description = CherryRGB UHID daemon
+
+[Service]
+EnvironmentFile = -/etc/default/cherryrgb
+ExecStart = /usr/libexec/cherryrgb_service $CHERRYRGB_OPTIONS
+
+[Install]
+WantedBy = multi-user.target

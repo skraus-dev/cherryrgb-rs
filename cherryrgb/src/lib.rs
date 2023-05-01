@@ -54,6 +54,8 @@
 
 mod extensions;
 mod models;
+#[cfg(all(target_os = "linux", feature = "uhid"))]
+mod vkbd;
 
 use binrw::BinReaderExt;
 use models::{Keymap, ProfileKey};
@@ -66,10 +68,14 @@ use thiserror::Error;
 // Re-exports
 pub use extensions::{OwnRGB8, ToVec};
 pub use hex;
+#[cfg(all(target_os = "linux", feature = "uhid"))]
+pub use models::RpcAnimation;
 pub use models::{Brightness, CustomKeyLeds, LightingMode, Packet, Payload, Speed};
 pub use rgb;
 pub use rusb;
 pub use strum;
+#[cfg(all(target_os = "linux", feature = "uhid"))]
+pub use vkbd::VirtKbd;
 
 // Constants
 /// USB Vendor ID - Cherry GmbH
@@ -78,6 +84,8 @@ pub const CHERRY_USB_VID: u16 = 0x046a;
 const INTERFACE_NUM: u8 = 1;
 const INTERRUPT_EP: u8 = 0x82;
 static TIMEOUT: Duration = Duration::from_millis(1000);
+#[cfg(all(target_os = "linux", feature = "uhid"))]
+static SHORT_TIMEOUT: Duration = Duration::from_millis(100);
 
 /// (64 byte packet - 4 byte packet header - 4 byte payload header)
 const CHUNK_SIZE: usize = 56;
@@ -219,6 +227,25 @@ impl CherryKeyboard {
 
         assert_eq!(device_desc.num_configurations(), 1);
         assert_eq!(config_desc.num_interfaces(), 2);
+
+        // This should find 2 endpoints with Interrupt inputs
+        for interface in config_desc.interfaces() {
+            for interface_desc in interface.descriptors() {
+                for endpoint_desc in interface_desc.endpoint_descriptors() {
+                    if endpoint_desc.direction() == rusb::Direction::In
+                        && endpoint_desc.transfer_type() == rusb::TransferType::Interrupt
+                    {
+                        log::debug!(
+                            "Found Interrupt input: ci={} if={} se={} addr=0x{:02x}",
+                            config_desc.number(),
+                            interface_desc.interface_number(),
+                            interface_desc.setting_number(),
+                            endpoint_desc.address()
+                        );
+                    }
+                }
+            }
+        }
 
         // Skip kernel driver detachment for non-unix platforms
         if cfg!(unix) {
@@ -405,6 +432,34 @@ impl CherryKeyboard {
         }
 
         Ok(all_keys)
+    }
+
+    /// forward a key event from our usb device to the virtual UHID keyboard,
+    /// filter out any bogus events while doing so.
+    #[cfg(all(target_os = "linux", feature = "uhid"))]
+    pub fn forward_filtered_keys(&self, vdevice: &mut VirtKbd) -> Result<(), CherryRgbError> {
+        let mut buf = [0; 64];
+        match self
+            .device_handle
+            .read_interrupt(INTERRUPT_EP, &mut buf, SHORT_TIMEOUT)
+        {
+            Ok(len) => {
+                // Bogus event data has bit 3 set in the 3rd byte
+                if len >= 3 && buf[2] >= 8 {
+                    log::debug!(" - BOGUS read {} bytes: {:?} filtered", len, &buf[..len]);
+                    return Ok(());
+                }
+                log::debug!(" - read {} bytes: {:?}", len, &buf[..len]);
+                vdevice.forward(&buf[..len]);
+            }
+            Err(err) => {
+                if err == rusb::Error::Timeout {
+                    return Ok(());
+                }
+                return Err(CherryRgbError::GeneralUsbError(err));
+            }
+        }
+        Ok(())
     }
 
     /// Just taken 1:1 from usb capture

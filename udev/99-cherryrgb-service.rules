@@ -1,0 +1,7 @@
+######################################
+# udev rule for Cherry RGB service   #
+######################################
+
+# Uncomment the following line to restart the cheeryrgb_service whenever a Cherry keyboard is plugged in.
+# You might need to adapt the absolute path to /usr/bin/systemctl if it is at a different location on your system
+ACTION=="add" SUBSYSTEMS=="usb", ATTR{idVendor}=="046a", ATTR{idProduct}=="*", RUN+="/usr/bin/systemctl restart cherryrgb.service"

@@ -1,5 +1,6 @@
 use binrw::{BinRead, BinReaderExt, BinResult, BinWrite, BinWriterExt, ReadOptions, WriteOptions};
 use rgb::RGB8;
+use serde::{Deserialize, Serialize};
 use std::{
     io::{Cursor, Read, Seek},
     str::FromStr,
@@ -24,7 +25,7 @@ where
 }
 
 /// Wrap around RGB8 type, to implement traits on it
-#[derive(Clone, Default, Debug, PartialEq)]
+#[derive(Clone, Default, Debug, PartialEq, Serialize, Deserialize)]
 pub struct OwnRGB8(RGB8);
 
 impl OwnRGB8 {

@@ -1,0 +1,17 @@
+[package]
+name = "cherryrgb_ncli"
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+
+[dependencies]
+cherryrgb = { path = "../cherryrgb" }
+anyhow = "1.0"
+structopt = "0.3"
+log = "0.4"
+serde_json = "1.0.96"
+
+[dependencies.simple_logger]
+version = "1.13"
+default-features = false
+features = ["colors"]
