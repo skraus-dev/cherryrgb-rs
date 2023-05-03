@@ -122,6 +122,13 @@ jobs:
           native: false
           foreign_arch: i686
           foreign_distro: ubuntu_latest
+        - os: ubuntu-latest
+          assetname: linux-ppc64le
+          target: powerpc64le-unknown-linux-gnu
+          buildopts: "--all --features uhid"
+          native: false
+          foreign_arch: ppc64le
+          foreign_distro: ubuntu_latest
     runs-on: ${{ matrix.job.os }}
     name: Build for ${{ matrix.job.target }}
     steps:
