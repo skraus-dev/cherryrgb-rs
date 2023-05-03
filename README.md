@@ -112,6 +112,7 @@ Now you can run the binary from `./target/debug/cherryrgb_cli`
 ## Install through package manager
 
 - AUR: [<code>cherryrgb</code>](https://aur.archlinux.org/packages/cherryrgb)
+- Fedora: [<code>cherryrgb</code>](https://copr.fedorainfracloud.org/coprs/felfert/cherryrgb/)
 
 ## Troubleshooting
 
