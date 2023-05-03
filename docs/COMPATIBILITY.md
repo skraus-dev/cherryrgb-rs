@@ -30,7 +30,7 @@ Please send a Pull Request with your keyboard model once you can report on suppo
 | MX 1.0 FL NBL                 | 0x00D2               | ❌      | ❌ / ❌ / ❌ |
 | MX 1.0 FL RGB                 | 0x00D3               | ❌      | ❌ / ❌ / ❌ |
 | G80 3000N TKL RGB             | 0x00DD (alt: 0x00E0) | ✅      | ✅ / ✅ / ❌ |
-| G80 3000N FL RGB              | 0x00DE (alt: 0x00E1) | ❌      | ❌ / ❌ / ❌ |
+| G80 3000N FL RGB              | 0x00DE (alt: 0x00E1) | ✅      | ✅ / ✅ / ❌ |
 | MX BOARD 10.0N FL RGB         | 0x00DF (alt: 0x00E2) | ✅      | ✅ / ✅ / ❌ |
 | MC 2.1  (Mouse)               | 0x01A4               | ❌      | ❌ / ❌ / ❌ |
 | MX BOARD 2.0S FL RGB DE       | 0x01A6               | ❌      | ❌ / ❌ / ❌ |
