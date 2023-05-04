@@ -157,7 +157,7 @@ jobs:
     - name: Build in container
       id: build_foreign
       if: ${{ ! matrix.job.native }}
-      uses: felfert/run-on-arch-action@master
+      uses: felfert/run-on-arch-action@custom
       with:
         arch: ${{ matrix.job.foreign_arch }}
         distro: ${{ matrix.job.foreign_distro }}
