@@ -162,6 +162,7 @@ jobs:
         arch: ${{ matrix.job.foreign_arch }}
         distro: ${{ matrix.job.foreign_distro }}
         githubToken: ${{ github.token }}
+        cachedImageTag: "rust-stable-toolchain-with-libclang-${{ matrix.job.foreign_arch }}-${{ matrix.job.foreign_distro }}"
         install: |
           ${{ env.INSTDEPS }} curl
           ${{ env.INSTCARGO }} --default-host ${{ matrix.job.target }}
