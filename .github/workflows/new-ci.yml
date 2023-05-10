@@ -1,0 +1,248 @@
+name: New CI
+
+on:
+  push:
+    branches:
+      'master'
+    tags:
+      '[0-9]+\.[0-9]+\.[0-9]+'
+  pull_request:
+    branches:
+      - 'master'
+    paths-ignore:
+      - 'LICENSE'
+      - '**/*.md'
+      - '.github/**/*'
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+  DEBIAN_FRONTEND: noninteractive
+  INSTDEPS: "apt-get update && apt-get install -y libclang-dev clang llvm"
+  INSTCARGO: "curl --proto '=https' --tlsv1.2 https://sh.rustup.rs -sSf | bash -s -- -y -q"
+
+jobs:
+  test:
+    name: Test Suite
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+      - name: Install build dependencies
+        run: sudo sh -c "${{ env.INSTDEPS }}"
+      - run: cargo test --all-features --workspace
+
+  rustfmt:
+    name: Rustfmt
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+      - name: Check formatting
+        run: cargo fmt --all -- --check
+
+  clippy:
+    name: Clippy
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+      - name: Install build dependencies
+        run: sudo sh -c "${{ env.INSTDEPS }}"
+      - name: Clippy check
+        run: cargo clippy --all-targets --all-features --workspace -- -D warnings
+
+  docs:
+    name: Docs
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+      - name: Install build dependencies
+        run: sudo sh -c "${{ env.INSTDEPS }}"
+      - name: Check documentation
+        env:
+          RUSTDOCFLAGS: -D warnings
+        run: cargo doc --no-deps --document-private-items --all-features --workspace
+
+  publish-dry-run:
+    name: Publish dry run
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+      - name: Publish dry-run
+        run: cargo publish -p cherryrgb --dry-run
+
+  clean:
+    if: ${{ github.event_name != 'pull_request' }} # If this is a pull request, stop here
+    name: Clean before matrix build
+    needs: [test, clippy, rustfmt, docs, publish-dry-run]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Clean target
+        run: rm -rf target
+
+  build:
+    needs: [clean]
+    strategy:
+      matrix:
+        # Name of the tar archives: <assetprefix>-<tag>-<assetname>.tar.gz
+        assetprefix: [cherryrgb-rs]
+        job:
+        - os: ubuntu-latest
+          assetname: linux-x86_64
+          target: x86_64-unknown-linux-gnu
+          buildopts: "--all --features uhid"
+          installdeps: true
+          native: true
+        - os: macos-latest
+          assetname: macos-x86_64
+          target: x86_64-apple-darwin
+          buildopts: ""
+          installdeps: false
+          native: true
+        - os: windows-latest
+          assetname: windows-x86_64
+          target: x86_64-pc-windows-msvc
+          buildopts: ""
+          installdeps: false
+          native: true
+        - os: ubuntu-latest
+          assetname: linux-arm64
+          target: aarch64-unknown-linux-gnu
+          buildopts: "--all --features uhid"
+          native: false
+          foreign_arch: aarch64
+          foreign_distro: ubuntu_latest
+        - os: ubuntu-latest
+          assetname: linux-i686
+          target: i686-unknown-linux-gnu
+          buildopts: "--all --features uhid"
+          native: false
+          foreign_arch: i686
+          foreign_distro: ubuntu_latest
+        - os: ubuntu-latest
+          assetname: linux-ppc64le
+          target: powerpc64le-unknown-linux-gnu
+          buildopts: "--all --features uhid"
+          native: false
+          foreign_arch: ppc64le
+          foreign_distro: ubuntu_latest
+    runs-on: ${{ matrix.job.os }}
+    name: Build for ${{ matrix.job.target }}
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v3
+    - name: Install native build dependencies
+      if: ${{ matrix.job.installdeps && matrix.job.native }}
+      run: sudo sh -c "${{ env.INSTDEPS }}"
+    - name: Retrieve target cache
+      uses: actions/cache@v3
+      with:
+        path: |
+          target
+          dotcargo.tgz
+        key: ${{ matrix.job.target }}-${{ hashFiles('Cargo.lock') }}
+        restore-keys: |
+          ${{ matrix.job.target }}
+        enableCrossOsArchive: true
+    - name: Build native
+      if: ${{ matrix.job.native }}
+      shell: bash
+      run: |
+        test -f dotcargo.tgz && tar xCf ${HOME} dotcargo.tgz || true
+        cargo build --release --target ${{ matrix.job.target }} ${{ matrix.job.buildopts }}
+        tar czCf ${HOME} dotcargo.tgz .cargo
+    - name: Build in container
+      id: build_foreign
+      if: ${{ ! matrix.job.native }}
+      uses: felfert/run-on-arch-action@custom
+      with:
+        arch: ${{ matrix.job.foreign_arch }}
+        distro: ${{ matrix.job.foreign_distro }}
+        githubToken: ${{ github.token }}
+        cachedImageTag: "rust-stable-toolchain-with-libclang-${{ matrix.job.foreign_arch }}-${{ matrix.job.foreign_distro }}"
+        install: |
+          ${{ env.INSTDEPS }} curl
+          ${{ env.INSTCARGO }} --default-host ${{ matrix.job.target }}
+        run: |
+          test -f dotcargo.tgz && tar xCf ${HOME} dotcargo.tgz || true
+          source "$HOME/.cargo/env"
+          cargo build --release --target ${{ matrix.job.target }} ${{ matrix.job.buildopts }}
+          for bin in cli ncli service; do
+            path=target/${{ matrix.job.target }}/release/cherryrgb_${bin}
+            test -f ${path} && strip ${path} || true
+          done
+          tar czCf ${HOME} dotcargo.tgz .cargo
+    - name: Update target cache
+      uses: actions/cache@v3
+      with:
+        path: |
+          target
+          dotcargo.tgz
+        key: ${{ matrix.job.target }}-${{ hashFiles('Cargo.lock') }}
+        restore-keys: |
+          ${{ matrix.job.target }}
+        enableCrossOsArchive: true
+    - name: Strip native binaries
+      if: ${{ matrix.job.native }}
+      shell: bash
+      run: |
+          case "${{ matrix.job.target }}" in
+            *linux*)
+              for bin in cli ncli service; do
+                path=target/${{ matrix.job.target }}/release/cherryrgb_${bin}
+                test -f ${path} && strip ${path} || true
+              done
+            ;;
+            *windows*)
+              strip target/${{ matrix.job.target }}/release/cherryrgb_cli.exe
+            ;;
+            *)
+              strip target/${{ matrix.job.target }}/release/cherryrgb_cli
+            ;;
+          esac
+    - name: Collect artifacts
+      shell: bash
+      run: |
+          mkdir -p artifacts/bin
+          case "${{ matrix.job.target }}" in
+            *linux*)
+              for bin in cli ncli service; do
+                path=target/${{ matrix.job.target }}/release/cherryrgb_${bin}
+                test -f ${path} && cp -av ${path} artifacts/bin/ || true
+              done
+              miscfiles="*.md LICENSE service/etc udev docs examples"
+            ;;
+            *windows*)
+              cp -av target/${{ matrix.job.target }}/release/cherryrgb_cli.exe artifacts/bin/
+              miscfiles="*.md LICENSE docs examples"
+            ;;
+            *)
+              cp -av target/${{ matrix.job.target }}/release/cherryrgb_cli artifacts/bin/
+              miscfiles="*.md LICENSE docs examples"
+            ;;
+          esac
+          cp -av ${miscfiles} artifacts/
+          tgz=${{ matrix.assetprefix }}-${{ github.ref_name }}-${{ matrix.job.assetname }}.tar.gz
+          tar cvzCf artifacts ${tgz} .
+          echo "${GITHUB_REF}" > github-ref
+          echo "${GITHUB_SHA}" > commithash
+    - name: Save artifacts
+      uses: actions/upload-artifact@v3
+      with:
+        name: cherryrgb-rs
+        path: |
+          github-ref
+          commithash
+          ${{ matrix.assetprefix }}-${{ github.ref_name }}-${{ matrix.job.assetname }}.tar.gz
+
+  deploy:
+    if: ${{ github.event_name == 'push' && github.ref_type == 'tag' }}
+    needs: [build]
+    name: Call
+    uses: ./.github/workflows/new-cd.yml
+    secrets: inherit
+    with:
+      artifact-id: cherryrgb-rs

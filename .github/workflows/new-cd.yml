@@ -1,0 +1,43 @@
+name: Publish
+
+on:
+  workflow_call:
+    inputs:
+      artifact-id:
+        required: true
+        type: string
+  workflow_dispatch:
+ 
+jobs:
+  publish-github:
+    if: ${{ github.ref_type == 'tag' && github.event_name != 'workflow_dispatch' }}
+    name: Publish to GitHub
+    runs-on: ubuntu-latest
+    steps:
+    - name: Fetch artifacts
+      uses: actions/download-artifact@v3
+      with:
+        name: ${{ inputs.artifact-id }}
+    - name: Calculate checksums
+      shell: bash
+      run: |
+        for tgz in *.tar.gz ; do
+          sha256sum ${tgz} > $(basename ${tgz} .tar.gz).sha256
+        done
+    - name: Release assets
+      uses: softprops/action-gh-release@v1
+      with:
+        files: |
+          *.tar.gz
+          *.sha256
+      env:
+        GITHUB_TOKEN: ${{ github.token }}
+
+  publish-cargo:
+    name: Publish to Cargo
+    if: ${{ github.ref_type == 'tag' || github.event_name == 'workflow_dispatch' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Publish crate
+        run: cargo publish -p cherryrgb --token ${{ secrets.CARGO_API_KEY }}
