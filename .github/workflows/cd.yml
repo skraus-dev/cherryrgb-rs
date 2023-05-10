@@ -1,136 +1,43 @@
-name: CD # Continuous Deployment
+name: Publish
 
 on:
-  push:
-
+  workflow_call:
+    inputs:
+      artifact-id:
+        required: true
+        type: string
+  workflow_dispatch:
+ 
 jobs:
-
-  publish:
-    name: Publishing for ${{ matrix.job.target }} ${{ matrix.job.os }} ${{ matrix.job.architecture }}
-    runs-on: ${{ matrix.job.os }}
-    strategy:
-      matrix:
-        project: [cherryrgb_cli]
-        rust: [stable]
-        job:
-          - os: macos-latest
-            os-name: macos
-            target: x86_64-apple-darwin
-            architecture: x86_64
-            binary-postfix: ""
-            use-cross: false
-            cargo-command: cargo
-          - os: ubuntu-latest
-            os-name: linux
-            target: x86_64-unknown-linux-gnu
-            architecture: x86_64
-            binary-postfix: ""
-            use-cross: false
-            cargo-command: cargo
-          - os: windows-latest
-            os-name: windows
-            target: x86_64-pc-windows-msvc
-            architecture: x86_64
-            binary-postfix: ".exe"
-            use-cross: false
-            cargo-command: cargo
-          - os: ubuntu-latest
-            os-name: linux
-            target: aarch64-unknown-linux-gnu
-            architecture: arm64
-            binary-postfix: ""
-            use-cross: true
-            cargo-command: cross
-          - os: ubuntu-latest
-            os-name: linux
-            target: i686-unknown-linux-gnu
-            architecture: i686
-            binary-postfix: ""
-            use-cross: true
-            cargo-command: cross
-
+  publish-github:
+    if: ${{ github.ref_type == 'tag' && github.event_name != 'workflow_dispatch' }}
+    name: Publish to GitHub
+    runs-on: ubuntu-latest
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v3
-      - uses: dtolnay/rust-toolchain@stable
-        with:
-          toolchain: stable
-      - name: Install cross
-        if: ${{ matrix.job.use-cross }}
-        run: cargo install cross
-
-      - name: Cargo build
-        run: ${{ matrix.job.cargo-command }} build --release --target ${{ matrix.job.target }} --all
-
-      - name: install strip command
-        shell: bash
-        run: |
-          if [[ ${{ matrix.job.target }} == aarch64-unknown-linux-gnu ]]; then
-              sudo apt update
-              sudo apt-get install -y binutils-aarch64-linux-gnu
-          fi
-      - name: Packaging final binary
-        env:
-          BINARY_NAME: ${{ matrix.project }}${{ matrix.job.binary-postfix }}
-        shell: bash
-        run: |
-          mkdir release_tmp/
-
-          cp target/${{ matrix.job.target }}/release/$BINARY_NAME release_tmp/
-          cp README.md release_tmp/
-          cp LICENSE release_tmp/
-          cp ./docs/COMPATIBILITY.md release_tmp/
-
-          cp -r examples release_tmp/
-
-          ###### For linux builds, copy the udev directory too ######
-          if [[ ${{ matrix.job.os-name }} == linux ]]; then
-            cp -r udev release_tmp/
-          fi
-
-          cd release_tmp/
-
-          ####### reduce binary size by removing debug symbols #######
-          if [[ ${{ matrix.job.target }} == aarch64-unknown-linux-gnu ]]; then
-            GCC_PREFIX="aarch64-linux-gnu-"
-          else
-            GCC_PREFIX=""
-          fi
-          "$GCC_PREFIX"strip $BINARY_NAME
-
-          ########## create tar.gz ##########
-          RELEASE_NAME=${{ matrix.project }}-`basename ${GITHUB_REF}`-${{ matrix.job.os-name }}-${{ matrix.job.architecture }}
-          tar czvf $RELEASE_NAME.tar.gz *
-
-          ########## create sha256 ##########
-          if [[ ${{ runner.os }} == 'Windows' ]]; then
-            certutil -hashfile $RELEASE_NAME.tar.gz sha256 | grep -E [A-Fa-f0-9]{64} > $RELEASE_NAME.sha256
-          else
-            shasum -a 256 $RELEASE_NAME.tar.gz > $RELEASE_NAME.sha256
-          fi
-      - name: Upload artifacts
-        uses: actions/upload-artifact@v3
-        with:
-          name: cherryrgb_cli
-          path: release_tmp/${{ matrix.project }}-*.tar.gz
-      - name: Releasing assets
-        if: startsWith(github.ref, 'refs/tags/')
-        uses: softprops/action-gh-release@v1
-        with:
-          files: |
-            release_tmp/${{ matrix.project }}-*.tar.gz
-            release_tmp/${{ matrix.project }}-*.sha256
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    - name: Fetch artifacts
+      uses: actions/download-artifact@v3
+      with:
+        name: ${{ inputs.artifact-id }}
+    - name: Calculate checksums
+      shell: bash
+      run: |
+        for tgz in *.tar.gz ; do
+          sha256sum ${tgz} > $(basename ${tgz} .tar.gz).sha256
+        done
+    - name: Release assets
+      uses: softprops/action-gh-release@v1
+      with:
+        files: |
+          *.tar.gz
+          *.sha256
+      env:
+        GITHUB_TOKEN: ${{ github.token }}
 
   publish-cargo:
-    name: Publishing to Cargo
-    if: startsWith(github.ref, 'refs/tags/')
+    name: Publish to Cargo
+    if: ${{ github.ref_type == 'tag' || github.event_name == 'workflow_dispatch' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-      - uses: dtolnay/rust-toolchain@stable
-        with:
-          toolchain: stable
       - name: Publish crate
         run: cargo publish -p cherryrgb --token ${{ secrets.CARGO_API_KEY }}
