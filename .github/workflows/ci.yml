@@ -18,8 +18,8 @@ on:
 env:
   CARGO_TERM_COLOR: always
   DEBIAN_FRONTEND: noninteractive
-  INSTDEPS: "apt-get update && apt-get install -y libclang-dev clang llvm"
-  INSTCARGO: "curl --proto '=https' --tlsv1.2 https://sh.rustup.rs -sSf | bash -s -- -y -q"
+  INSTDEPS: "apt-get update && apt-get install -y libclang-dev clang"
+  RUSTFLAGS: "-C link-arg=-s"
 
 jobs:
   test:
@@ -113,27 +113,29 @@ jobs:
           target: aarch64-unknown-linux-gnu
           buildopts: "--all --features uhid"
           native: false
-          foreign_arch: aarch64
-          foreign_distro: ubuntu_latest
+          imagetag: edge
         - os: ubuntu-latest
           assetname: linux-i686
           target: i686-unknown-linux-gnu
           buildopts: "--all --features uhid"
           native: false
-          foreign_arch: i686
-          foreign_distro: ubuntu_latest
+          imagetag: edge
         - os: ubuntu-latest
           assetname: linux-ppc64le
           target: powerpc64le-unknown-linux-gnu
           buildopts: "--all --features uhid"
           native: false
-          foreign_arch: ppc64le
-          foreign_distro: ubuntu_latest
+          imagetag: edge
     runs-on: ${{ matrix.job.os }}
     name: Build for ${{ matrix.job.target }}
     steps:
     - name: Checkout
       uses: actions/checkout@v3
+    - name: Initialize CARGO_HOME
+      shell: bash
+      # The following must be set from within a shell, because HOME is not preset in a github runner context.
+      # See also https://docs.github.com/en/actions/using-workflows/workflow-commands-for-github-actions#setting-an-environment-variable
+      run: echo "CARGO_HOME=${HOME}/.cargo-${{ matrix.job.target }}" >> "$GITHUB_ENV"
     - name: Install native build dependencies
       if: ${{ matrix.job.installdeps && matrix.job.native }}
       run: sudo sh -c "${{ env.INSTDEPS }}"
@@ -142,67 +144,49 @@ jobs:
       with:
         path: |
           target
-          dotcargo.tgz
+          ${{ env.CARGO_HOME }}/bin/
+          ${{ env.CARGO_HOME }}/registry/index/
+          ${{ env.CARGO_HOME }}/registry/cache/
+          ${{ env.CARGO_HOME }}/git/db/
         key: ${{ matrix.job.target }}-${{ hashFiles('Cargo.lock') }}
         restore-keys: |
           ${{ matrix.job.target }}
         enableCrossOsArchive: true
     - name: Build native
       if: ${{ matrix.job.native }}
-      shell: bash
       run: |
-        test -f dotcargo.tgz && tar xCf ${HOME} dotcargo.tgz || true
         cargo build --release --target ${{ matrix.job.target }} ${{ matrix.job.buildopts }}
-        tar czCf ${HOME} dotcargo.tgz .cargo
-    - name: Build in container
+    - name: Install cross-rs
+      id: install_cross
+      if: ${{ ! matrix.job.native }}
+      run: test -f ${{ env.CARGO_HOME }}/bin/cross && echo "::notice::cross provided from cache, skipping install" || cargo install cross
+    - name: Configure cross
+      id: configure_cross
+      if: ${{ ! matrix.job.native }}
+      run: |
+        cat > Cross.toml << EOM
+        [target.${{ matrix.job.target }}]
+        image = "ghcr.io/cross-rs/${{ matrix.job.target }}:${{ matrix.job.imagetag }}"
+        pre-build = ["${{ env.INSTDEPS }}"]
+        EOM
+    - name: Build with cross
       id: build_foreign
       if: ${{ ! matrix.job.native }}
-      uses: felfert/run-on-arch-action@custom
-      with:
-        arch: ${{ matrix.job.foreign_arch }}
-        distro: ${{ matrix.job.foreign_distro }}
-        githubToken: ${{ github.token }}
-        cachedImageTag: "rust-stable-toolchain-with-libclang-${{ matrix.job.foreign_arch }}-${{ matrix.job.foreign_distro }}"
-        install: |
-          ${{ env.INSTDEPS }} curl
-          ${{ env.INSTCARGO }} --default-host ${{ matrix.job.target }}
-        run: |
-          test -f dotcargo.tgz && tar xCf ${HOME} dotcargo.tgz || true
-          source "$HOME/.cargo/env"
-          cargo build --release --target ${{ matrix.job.target }} ${{ matrix.job.buildopts }}
-          for bin in cli ncli service; do
-            path=target/${{ matrix.job.target }}/release/cherryrgb_${bin}
-            test -f ${path} && strip ${path} || true
-          done
-          tar czCf ${HOME} dotcargo.tgz .cargo
+      run: |
+        ${{ env.CARGO_HOME }}/bin/cross build --release --target ${{ matrix.job.target }} ${{ matrix.job.buildopts }}
     - name: Update target cache
       uses: actions/cache@v3
       with:
         path: |
           target
-          dotcargo.tgz
+          ${{ env.CARGO_HOME }}/bin/
+          ${{ env.CARGO_HOME }}/registry/index/
+          ${{ env.CARGO_HOME }}/registry/cache/
+          ${{ env.CARGO_HOME }}/git/db/
         key: ${{ matrix.job.target }}-${{ hashFiles('Cargo.lock') }}
         restore-keys: |
           ${{ matrix.job.target }}
         enableCrossOsArchive: true
-    - name: Strip native binaries
-      if: ${{ matrix.job.native }}
-      shell: bash
-      run: |
-          case "${{ matrix.job.target }}" in
-            *linux*)
-              for bin in cli ncli service; do
-                path=target/${{ matrix.job.target }}/release/cherryrgb_${bin}
-                test -f ${path} && strip ${path} || true
-              done
-            ;;
-            *windows*)
-              strip target/${{ matrix.job.target }}/release/cherryrgb_cli.exe
-            ;;
-            *)
-              strip target/${{ matrix.job.target }}/release/cherryrgb_cli
-            ;;
-          esac
     - name: Collect artifacts
       shell: bash
       run: |
