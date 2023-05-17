@@ -1,9 +1,9 @@
-## New UHID service and correspondig new cli
+## New UHID service and corresponding new cli
 
 ### Preface
 
 The UHID feature is available **on Linux only**.
-The motivation for this new was [this issue](https://github.com/skraus-dev/cherryrgb-rs/issues/22).
+The motivation for this new implementation was [this issue](https://github.com/skraus-dev/cherryrgb-rs/issues/22).
 
 ### How to build
 In order to build everything, you now must use the ``--all`` flag and enable the feature ``uhid``

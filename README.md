@@ -31,6 +31,13 @@ Missing
 
 Please see [Docs.rs](https://docs.rs/cherryrgb)
 
+
+## UHID Service
+
+To workaround the issue of ["slow keypresses"](#keyboard-device-is-not-discovered-aka-keyboard-not-found-in-normal-user-context), @felfert implemented a userspace HID driver/service and a corresponding CLI.
+
+Check out [UHID Driver documentation](./docs/UHID-driver.md) on how to install and use it.
+
 ## CLI
 
 Get usage help
