@@ -149,6 +149,14 @@ This project is not affiliated or endorsed by Cherry GmbH.
 
 ## Changelog
 
+### v0.2.5 - 17/05/2023
+
+* lib: Query rusb for detach support (by @felfert)
+* general: Add ppc64le build (by @felfert)
+* compatibility report: G80-3000N FL RGB (by @TheBiochemic)
+* docs: Add documentation about service usage (by @felfert)
+* service: Implement service daemon and new client (uhid) (by @felfert)
+
 ### v0.2.4 - 25/04/2023
 
 * lib: Rework fetch_device_state to use GetKeymap and GetKeyIndexes
