@@ -1,7 +1,7 @@
 [package]
 name = "cherryrgb"
-version = "0.2.4"
-edition = "2018"
+version.workspace = true
+edition.workspace = true
 description = "Cherry RGB keyboard instrumentation"
 repository = "https://github.com/skraus-dev/cherryrgb-rs"
 license = "MIT"
