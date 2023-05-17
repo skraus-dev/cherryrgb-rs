@@ -3,7 +3,7 @@
 [![Crates.io](https://img.shields.io/crates/v/cherryrgb.svg)](https://crates.io/crates/cherryrgb)
 [![Docs.rs](https://docs.rs/cherryrgb/badge.svg)](https://docs.rs/cherryrgb)
 [![GitHub release](https://img.shields.io/github/v/release/skraus-dev/cherryrgb-rs?include_prereleases)](https://github.com/skraus-dev/cherryrgb-rs/releases/latest)
-[![CI](https://github.com/skraus-dev/cherryrgb-rs/workflows/CI/badge.svg)](https://github.com/skraus-dev/cherryrgb-rs/actions)
+[![CI](https://github.com/skraus-dev/cherryrgb-rs/workflows/New%20CI/badge.svg)](https://github.com/skraus-dev/cherryrgb-rs/actions)
 
 ## Compatibility
 
@@ -119,7 +119,7 @@ Now you can run the binary from `./target/debug/cherryrgb_cli`
 ## Install through package manager
 
 - AUR: [<code>cherryrgb</code>](https://aur.archlinux.org/packages/cherryrgb)
-- Fedora: [<code>cherryrgb</code>](https://copr.fedorainfracloud.org/coprs/felfert/cherryrgb/)
+- Fedora: [<code>cherryrgb</code>](https://copr.fedorainfracloud.org/coprs/felfert/cherryrgb/) [![Copr build status](https://copr.fedorainfracloud.org/coprs/felfert/cherryrgb/package/cherryrgb/status_image/last_build.png)](https://copr.fedorainfracloud.org/coprs/felfert/cherryrgb/package/cherryrgb/)
 
 ## Troubleshooting
 
