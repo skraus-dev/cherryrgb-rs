@@ -247,8 +247,8 @@ impl CherryKeyboard {
             }
         }
 
-        // Skip kernel driver detachment for non-unix platforms
-        if cfg!(unix) {
+        // Skip kernel driver detachment if unsupported
+        if rusb::supports_detach_kernel_driver() {
             device_handle
                 .set_auto_detach_kernel_driver(true)
                 .map_err(|e| {
