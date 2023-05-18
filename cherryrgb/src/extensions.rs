@@ -1,4 +1,4 @@
-use binrw::{BinRead, BinReaderExt, BinResult, BinWrite, BinWriterExt, ReadOptions, WriteOptions};
+use binrw::{BinRead, BinReaderExt, BinResult, BinWrite, BinWriterExt, Endian};
 use rgb::RGB8;
 use serde::{Deserialize, Serialize};
 use std::{
@@ -46,7 +46,7 @@ impl BinRead for OwnRGB8 {
 
     fn read_options<R: Read + Seek>(
         reader: &mut R,
-        _: &ReadOptions,
+        _: Endian,
         _: Self::Args,
     ) -> BinResult<Self> {
         let rgb = RGB8 {
@@ -65,7 +65,7 @@ impl BinWrite for OwnRGB8 {
     fn write_options<W: std::io::Write + Seek>(
         &self,
         writer: &mut W,
-        _: &WriteOptions,
+        _: Endian,
         _: Self::Args,
     ) -> BinResult<()> {
         writer.write_ne(&self.0.r)?;

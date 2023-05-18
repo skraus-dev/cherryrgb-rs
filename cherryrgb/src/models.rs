@@ -4,7 +4,7 @@ use crate::{
     CherryRgbError, CHUNK_SIZE, TOTAL_KEYS,
 };
 
-use binrw::{binrw, until_eof, BinRead, BinWrite, BinWriterExt};
+use binrw::{binrw, until_eof, BinRead, BinWrite, BinWriterExt, Endian};
 use serde::{Deserialize, Serialize};
 use std::convert::TryFrom;
 use strum_macros::{EnumProperty, EnumString, EnumVariantNames};
@@ -272,7 +272,7 @@ impl BinWrite for CustomKeyLeds {
     fn write_options<W: std::io::Write + std::io::Seek>(
         &self,
         writer: &mut W,
-        _: &binrw::WriteOptions,
+        _: Endian,
         _: Self::Args,
     ) -> binrw::BinResult<()> {
         for val in &self.key_leds {
