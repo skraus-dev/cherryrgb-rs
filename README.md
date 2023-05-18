@@ -156,6 +156,10 @@ This project is not affiliated or endorsed by Cherry GmbH.
 
 ## Changelog
 
+### v0.2.6 - 18/05/2023
+
+* meta: docs.rs buildfix (by @felfert)
+
 ### v0.2.5 - 17/05/2023
 
 * lib: Query rusb for detach support (by @felfert)
