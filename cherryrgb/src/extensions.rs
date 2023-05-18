@@ -15,11 +15,11 @@ pub trait ToVec: BinWrite {
 impl<T> ToVec for T
 where
     <T as BinWrite>::Args: Default,
-    T: BinWrite,
+    T: BinWrite + binrw::meta::WriteEndian,
 {
     fn to_vec(self) -> Vec<u8> {
         let mut buf = Cursor::new(Vec::new());
-        self.write_to(&mut buf).unwrap();
+        self.write(&mut buf).unwrap();
         buf.into_inner()
     }
 }
