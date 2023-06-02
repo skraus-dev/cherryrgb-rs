@@ -14,7 +14,7 @@ pub trait ToVec: BinWrite {
 
 impl<T> ToVec for T
 where
-    <T as BinWrite>::Args: Default,
+    for<'a> <T as BinWrite>::Args<'a>: Default,
     T: BinWrite + binrw::meta::WriteEndian,
 {
     fn to_vec(self) -> Vec<u8> {
@@ -42,12 +42,12 @@ impl From<RGB8> for OwnRGB8 {
 }
 
 impl BinRead for OwnRGB8 {
-    type Args = ();
+    type Args<'a> = ();
 
     fn read_options<R: Read + Seek>(
         reader: &mut R,
         _: Endian,
-        _: Self::Args,
+        _: Self::Args<'_>,
     ) -> BinResult<Self> {
         let rgb = RGB8 {
             r: reader.read_ne()?,
@@ -60,13 +60,13 @@ impl BinRead for OwnRGB8 {
 }
 
 impl BinWrite for OwnRGB8 {
-    type Args = ();
+    type Args<'a> = ();
 
     fn write_options<W: std::io::Write + Seek>(
         &self,
         writer: &mut W,
         _: Endian,
-        _: Self::Args,
+        _: Self::Args<'_>,
     ) -> BinResult<()> {
         writer.write_ne(&self.0.r)?;
         writer.write_ne(&self.0.g)?;

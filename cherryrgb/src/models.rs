@@ -183,8 +183,8 @@ impl PayloadType for Payload {
 }
 
 pub trait PayloadReadWrite:
-    BinRead<Args = (u8,)>
-    + BinWrite<Args = ()>
+    for<'a> BinRead<Args<'a> = (u8,)>
+    + for<'a> BinWrite<Args<'a> = ()>
     + PayloadType
     + binrw::meta::ReadEndian
     + binrw::meta::WriteEndian
@@ -267,13 +267,13 @@ impl ProfileKey {
 }
 
 impl BinWrite for CustomKeyLeds {
-    type Args = ();
+    type Args<'a> = ();
 
-    fn write_options<W: std::io::Write + std::io::Seek>(
+    fn write_options<'a, W: std::io::Write + std::io::Seek>(
         &self,
         writer: &mut W,
         _: Endian,
-        _: Self::Args,
+        _: Self::Args<'_>,
     ) -> binrw::BinResult<()> {
         for val in &self.key_leds {
             writer.write_ne(val)?;
