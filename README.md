@@ -156,6 +156,10 @@ This project is not affiliated or endorsed by Cherry GmbH.
 
 ## Changelog
 
+### v0.2.7 - 03/06/2023
+
+* deps: Bump binrw to v0.11.2 (thx @felfert once again :))
+
 ### v0.2.6 - 18/05/2023
 
 * meta: docs.rs buildfix (by @felfert)
