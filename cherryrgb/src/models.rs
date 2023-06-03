@@ -4,7 +4,7 @@ use crate::{
     CherryRgbError, CHUNK_SIZE, TOTAL_KEYS,
 };
 
-use binrw::{binrw, until_eof, BinRead, BinWrite, BinWriterExt};
+use binrw::{binrw, until_eof, BinRead, BinWrite, BinWriterExt, Endian};
 use serde::{Deserialize, Serialize};
 use std::convert::TryFrom;
 use strum_macros::{EnumProperty, EnumString, EnumVariantNames};
@@ -109,7 +109,8 @@ pub trait PayloadType {
 
 /// Payloads
 #[binrw]
-#[br(import(payload_type: u8))]
+#[br(little, import(payload_type: u8))]
+#[bw(little)]
 #[derive(Clone, Debug)]
 pub enum Payload {
     #[br(pre_assert(payload_type == 0x1))]
@@ -181,11 +182,25 @@ impl PayloadType for Payload {
     }
 }
 
+pub trait PayloadReadWrite:
+    for<'a> BinRead<Args<'a> = (u8,)>
+    + for<'a> BinWrite<Args<'a> = ()>
+    + PayloadType
+    + binrw::meta::ReadEndian
+    + binrw::meta::WriteEndian
+{
+}
+
+impl PayloadReadWrite for Payload {}
+
 /// Common packet structure
 #[binrw]
-#[brw(magic = 4u8)]
+#[brw(little, magic = 4u8)]
 #[derive(Clone, Debug)]
-pub struct Packet<T: BinRead<Args = (u8,)> + BinWrite<Args = ()> + PayloadType> {
+pub struct Packet<T>
+where
+    T: PayloadReadWrite,
+{
     // magic, fixed to 0x04, see `br(magic = ...)`
     checksum: u16,
     #[br(temp)]
@@ -197,7 +212,7 @@ pub struct Packet<T: BinRead<Args = (u8,)> + BinWrite<Args = ()> + PayloadType> 
 
 impl<T> Packet<T>
 where
-    T: BinRead<Args = (u8,)> + BinWrite<Args = ()> + PayloadType + Clone,
+    T: PayloadReadWrite + Clone,
 {
     pub fn new(inner: T) -> Self {
         let checksum = calc_checksum(inner.payload_type(), &inner.clone().to_vec());
@@ -252,19 +267,26 @@ impl ProfileKey {
 }
 
 impl BinWrite for CustomKeyLeds {
-    type Args = ();
+    type Args<'a> = ();
 
-    fn write_options<W: std::io::Write + std::io::Seek>(
+    fn write_options<'a, W: std::io::Write + std::io::Seek>(
         &self,
         writer: &mut W,
-        _: &binrw::WriteOptions,
-        _: Self::Args,
+        _: Endian,
+        _: Self::Args<'_>,
     ) -> binrw::BinResult<()> {
         for val in &self.key_leds {
             writer.write_ne(val)?;
         }
         Ok(())
     }
+}
+
+impl binrw::meta::ReadEndian for CustomKeyLeds {
+    const ENDIAN: binrw::meta::EndianKind = binrw::meta::EndianKind::None;
+}
+impl binrw::meta::WriteEndian for CustomKeyLeds {
+    const ENDIAN: binrw::meta::EndianKind = binrw::meta::EndianKind::None;
 }
 
 impl TryFrom<Vec<ProfileKey>> for CustomKeyLeds {

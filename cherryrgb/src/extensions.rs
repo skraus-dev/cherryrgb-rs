@@ -1,4 +1,4 @@
-use binrw::{BinRead, BinReaderExt, BinResult, BinWrite, BinWriterExt, ReadOptions, WriteOptions};
+use binrw::{BinRead, BinReaderExt, BinResult, BinWrite, BinWriterExt, Endian};
 use rgb::RGB8;
 use serde::{Deserialize, Serialize};
 use std::{
@@ -14,12 +14,12 @@ pub trait ToVec: BinWrite {
 
 impl<T> ToVec for T
 where
-    <T as BinWrite>::Args: Default,
-    T: BinWrite,
+    for<'a> <T as BinWrite>::Args<'a>: Default,
+    T: BinWrite + binrw::meta::WriteEndian,
 {
     fn to_vec(self) -> Vec<u8> {
         let mut buf = Cursor::new(Vec::new());
-        self.write_to(&mut buf).unwrap();
+        self.write(&mut buf).unwrap();
         buf.into_inner()
     }
 }
@@ -42,12 +42,12 @@ impl From<RGB8> for OwnRGB8 {
 }
 
 impl BinRead for OwnRGB8 {
-    type Args = ();
+    type Args<'a> = ();
 
     fn read_options<R: Read + Seek>(
         reader: &mut R,
-        _: &ReadOptions,
-        _: Self::Args,
+        _: Endian,
+        _: Self::Args<'_>,
     ) -> BinResult<Self> {
         let rgb = RGB8 {
             r: reader.read_ne()?,
@@ -60,13 +60,13 @@ impl BinRead for OwnRGB8 {
 }
 
 impl BinWrite for OwnRGB8 {
-    type Args = ();
+    type Args<'a> = ();
 
     fn write_options<W: std::io::Write + Seek>(
         &self,
         writer: &mut W,
-        _: &WriteOptions,
-        _: Self::Args,
+        _: Endian,
+        _: Self::Args<'_>,
     ) -> BinResult<()> {
         writer.write_ne(&self.0.r)?;
         writer.write_ne(&self.0.g)?;

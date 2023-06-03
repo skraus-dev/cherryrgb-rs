@@ -62,20 +62,22 @@ dependencies = [
 
 [[package]]
 name = "binrw"
-version = "0.8.0"
+version = "0.11.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d479fa33e2335c8289267d60a2bbd30dae31f8ab04b8bd9fc3353958edccb83a"
+checksum = "ab81d22cbd2d745852348b2138f3db2103afa8ce043117a374581926a523e267"
 dependencies = [
  "array-init",
  "binrw_derive",
+ "bytemuck",
 ]
 
 [[package]]
 name = "binrw_derive"
-version = "0.8.0"
+version = "0.11.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ac7f612479ad23cc83ce25201586316012a0f2d74a81244b5dbdf9baa3726b09"
+checksum = "d6b019a3efebe7f453612083202887b6f1ace59e20d010672e336eea4ed5be97"
 dependencies = [
+ "either",
  "owo-colors",
  "proc-macro2",
  "quote",
@@ -99,9 +101,9 @@ dependencies = [
 
 [[package]]
 name = "bytemuck"
-version = "1.7.2"
+version = "1.13.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "72957246c41db82b8ef88a5486143830adeb8227ef9837740bdec67724cf2c5b"
+checksum = "17febce684fd15d89027105661fec94afb475cb995fbc59d2865198446ba2eea"
 
 [[package]]
 name = "cc"
@@ -266,6 +268,12 @@ dependencies = [
  "crypto-common",
  "subtle",
 ]
+
+[[package]]
+name = "either"
+version = "1.8.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7fcaabb2fef8c910e7f4c7ce9f67a1283a1715879a7c230ca9d6d1ae31f16d91"
 
 [[package]]
 name = "enumflags2"
@@ -468,9 +476,9 @@ checksum = "b7e5500299e16ebb147ae15a00a942af264cf3688f47923b8fc2cd5858f23ad3"
 
 [[package]]
 name = "owo-colors"
-version = "2.1.0"
+version = "3.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3a61765925aec40abdb23812a3a1a01fafc6ffb9da22768b2ce665a9e84e527c"
+checksum = "c1b04fb49957986fdce4d6ee7a65027d55d4b6d2265e5848bbb507b58ccfdb6f"
 
 [[package]]
 name = "peeking_take_while"
