@@ -1,5 +1,6 @@
 use anyhow::{anyhow, Context, Result};
 use cherryrgb::{self, CherryKeyboard, CustomKeyLeds, RpcAnimation, VirtKbd};
+use clap::Parser;
 use file_mode::ModePath;
 use log::LevelFilter;
 use nix::unistd::{chown, Group};
@@ -9,43 +10,46 @@ use std::path::Path;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::{thread, time};
-use structopt::StructOpt;
 use systemd_journal_logger::{connected_to_journal, JournalLog};
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 const NAME: &str = env!("CARGO_PKG_NAME");
 
-#[derive(StructOpt, Debug, Clone)]
-#[structopt(name = NAME, about = "Service for cherryrgb_ncli")]
+#[derive(Parser, Debug, Clone)]
+#[command(author, version, about, long_about = None)]
 struct Opt {
     /// Enable debug output
-    #[structopt(short, long)]
+    #[arg(short, long)]
     debug: bool,
 
-    #[structopt(
+    #[arg(
+        short,
         long,
         help = "Must be specified if multiple cherry products are detected."
     )]
     product_id: Option<String>,
 
-    #[structopt(
+    #[arg(
         name = "socket",
+        short,
         long,
         help = "Path of listening socket to create.",
         default_value = "/run/cherryrgb.sock"
     )]
     socket_path: String,
 
-    #[structopt(
+    #[arg(
         name = "socketmode",
+        short = 'm',
         long,
         help = "Permissions of the socket.",
         default_value = "0664"
     )]
     socket_mode: String,
 
-    #[structopt(
+    #[arg(
         name = "socketgroup",
+        short = 'g',
         long,
         help = "Group of the socket.",
         default_value = "root"
@@ -225,7 +229,7 @@ fn get_u16_from_string(pid: Option<String>) -> Option<u16> {
 }
 
 fn main() -> Result<()> {
-    let opt = Opt::from_args();
+    let opt = Opt::parse();
 
     if connected_to_journal() {
         // If the output streams of this process are directly connected to the

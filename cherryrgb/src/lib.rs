@@ -73,7 +73,6 @@ pub use models::RpcAnimation;
 pub use models::{Brightness, CustomKeyLeds, LightingMode, Packet, Payload, Speed};
 pub use rgb;
 pub use rusb;
-pub use strum;
 #[cfg(all(target_os = "linux", feature = "uhid"))]
 pub use vkbd::VirtKbd;
 

@@ -1,5 +1,6 @@
 [package]
 name = "cherryrgb_cli"
+description = "Test tool for Cherry RGB Keyboard"
 version.workspace = true
 edition.workspace = true
 publish = false
@@ -21,8 +22,8 @@ publish = false
 
 [dependencies]
 cherryrgb = { path = "cherryrgb" }
+clap = { version = "4.3.1", features = ["derive", "cargo", "wrap_help"] }
 anyhow = "1.0"
-structopt = "0.3"
 log = "0.4"
 
 [dependencies.simple_logger]

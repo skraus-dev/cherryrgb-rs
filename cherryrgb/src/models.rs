@@ -5,9 +5,10 @@ use crate::{
 };
 
 use binrw::{binrw, until_eof, BinRead, BinWrite, BinWriterExt, Endian};
+use clap::ValueEnum;
 use serde::{Deserialize, Serialize};
 use std::convert::TryFrom;
-use strum_macros::{EnumProperty, EnumString, EnumVariantNames};
+use strum_macros::{EnumProperty, EnumString};
 
 /// Mode attributes:
 /// -> C: Supports color option
@@ -16,8 +17,9 @@ use strum_macros::{EnumProperty, EnumString, EnumVariantNames};
 #[binrw]
 #[brw(repr = u8)]
 #[derive(
-    Clone, Eq, PartialEq, Debug, EnumString, EnumProperty, EnumVariantNames, Serialize, Deserialize,
+    Clone, Eq, PartialEq, Debug, EnumString, EnumProperty, ValueEnum, Serialize, Deserialize,
 )]
+#[clap(rename_all = "snake_case")]
 #[strum(serialize_all = "snake_case")]
 pub enum LightingMode {
     #[strum(props(attr = "CS"))]
@@ -71,7 +73,8 @@ pub enum UsbPollingRate {
 /// LED animation speed
 #[binrw]
 #[brw(repr = u8)]
-#[derive(Clone, Eq, PartialEq, Debug, EnumString, EnumVariantNames, Serialize, Deserialize)]
+#[derive(Clone, Eq, PartialEq, Debug, EnumString, ValueEnum, Serialize, Deserialize)]
+#[clap(rename_all = "snake_case")]
 #[strum(serialize_all = "snake_case")]
 pub enum Speed {
     VeryFast = 0,
@@ -84,7 +87,8 @@ pub enum Speed {
 /// LED brightness
 #[binrw]
 #[brw(repr = u8)]
-#[derive(Clone, Eq, PartialEq, Debug, EnumString, EnumVariantNames, Serialize, Deserialize)]
+#[derive(Clone, Eq, PartialEq, Debug, EnumString, ValueEnum, Serialize, Deserialize)]
+#[clap(rename_all = "snake_case")]
 #[strum(serialize_all = "snake_case")]
 pub enum Brightness {
     Off = 0,
