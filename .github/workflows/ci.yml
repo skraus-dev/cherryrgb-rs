@@ -74,6 +74,15 @@ jobs:
       - name: Publish dry-run
         run: cargo publish -p cherryrgb --dry-run
 
+  check-cargo-lock:
+    if: ${{ github.event_name == 'push' && github.ref_type == 'tag' }}
+    name: Check Cargo.lock
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+      - run: cargo fetch --locked
+
   clean:
     if: ${{ github.event_name != 'pull_request' }} # If this is a pull request, stop here
     name: Clean before matrix build
@@ -224,7 +233,7 @@ jobs:
 
   deploy:
     if: ${{ github.event_name == 'push' && github.ref_type == 'tag' }}
-    needs: [build]
+    needs: [build, check-cargo-lock]
     name: Call
     uses: ./.github/workflows/cd.yml
     secrets: inherit
