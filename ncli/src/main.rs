@@ -1,59 +1,58 @@
 use std::{convert::TryFrom, io::Read, io::Write, path::PathBuf};
 
 use anyhow::{Context, Result};
-use cherryrgb::strum::VariantNames;
 use cherryrgb::{
     self, read_color_profile, rgb, Brightness, CustomKeyLeds, LightingMode, OwnRGB8, RpcAnimation,
     Speed,
 };
+use clap::{Parser, Subcommand};
 use std::os::unix::net::UnixStream;
-use structopt::StructOpt;
 
-#[derive(StructOpt, Debug)]
+#[derive(Parser, Debug)]
 struct AnimationArgs {
     /// Set LED mode
-    #[structopt(possible_values = LightingMode::VARIANTS)]
+    #[arg(value_enum)]
     mode: LightingMode,
 
     /// Set speed
-    #[structopt(possible_values = Speed::VARIANTS)]
+    #[arg(value_enum)]
     speed: Speed,
 
     /// Color (e.g ff00ff)
     color: Option<OwnRGB8>,
 
     /// Enable rainbow colors
-    #[structopt(short, long)]
+    #[arg(short, long)]
     rainbow: bool,
 }
 
-#[derive(StructOpt, Debug)]
+#[derive(Parser, Debug)]
 struct CustomColorOptions {
     colors: Vec<OwnRGB8>,
 }
 
-#[derive(StructOpt, Debug)]
+#[derive(Parser, Debug)]
 struct ColorProfileFileOptions {
-    #[structopt(parse(from_os_str))]
     file_path: PathBuf,
 }
 
-#[derive(StructOpt, Debug)]
+#[derive(Subcommand, Debug)]
 enum CliCommand {
     Animation(AnimationArgs),
     CustomColors(CustomColorOptions),
     ColorProfileFile(ColorProfileFileOptions),
 }
 
-#[derive(StructOpt, Debug)]
-#[structopt(name = "cherryrgb_ncli", about = "Test tool for Cherry RGB Keyboard")]
+#[derive(Parser, Debug)]
+#[command(author, version, about, long_about = None)]
 struct Opt {
     /// Enable debug output
-    #[structopt(short, long)]
+    #[arg(short, long)]
     debug: bool,
 
-    #[structopt(
+    #[arg(
         name = "socket",
+        short,
         long,
         help = "Path of socket to connect.",
         default_value = "/run/cherryrgb.sock"
@@ -61,11 +60,11 @@ struct Opt {
     socket_path: String,
 
     // Subcommand
-    #[structopt(subcommand)]
+    #[command(subcommand)]
     command: CliCommand,
 
     /// Set brightness
-    #[structopt(short, long, default_value = "full", possible_values = Brightness::VARIANTS)]
+    #[arg(short, long, default_value_t = Brightness::Full, value_enum)]
     brightness: Brightness,
 }
 
@@ -123,7 +122,7 @@ impl UnixClient {
 }
 
 fn main() -> Result<()> {
-    let opt = Opt::from_args();
+    let opt = Opt::parse();
 
     let loglevel = if opt.debug {
         log::Level::Debug
