@@ -1,72 +1,21 @@
-use std::{convert::TryFrom, io::Read, path::PathBuf};
+use std::{convert::TryFrom, io::Read};
 
 use anyhow::{anyhow, Context, Result};
-use cherryrgb::{
-    self, read_color_profile, rgb, Brightness, CherryKeyboard, CustomKeyLeds, LightingMode,
-    OwnRGB8, Speed,
-};
-use clap::{Parser, Subcommand};
+use cherryrgb::{self, read_color_profile, rgb, CherryKeyboard, CustomKeyLeds};
+use clap::Parser;
 
-#[derive(Parser, Debug)]
-struct AnimationArgs {
-    /// Set LED mode
-    #[arg(value_enum)]
-    mode: LightingMode,
-
-    /// Set speed
-    #[arg(value_enum)]
-    speed: Speed,
-
-    /// Color (e.g ff00ff)
-    color: Option<OwnRGB8>,
-
-    /// Enable rainbow colors
-    #[arg(short, long)]
-    rainbow: bool,
-}
-
-#[derive(Parser, Debug)]
-struct CustomColorOptions {
-    colors: Vec<OwnRGB8>,
-}
-
-#[derive(Parser, Debug)]
-struct ColorProfileFileOptions {
-    file_path: PathBuf,
-}
-
-#[derive(Subcommand, Debug)]
-enum CliCommand {
-    Animation(AnimationArgs),
-    CustomColors(CustomColorOptions),
-    ColorProfileFile(ColorProfileFileOptions),
-}
-
-#[derive(Parser, Debug)]
-#[command(author, version, about, long_about = None)]
-struct Opt {
-    /// Enable debug output
-    #[arg(short, long)]
-    debug: bool,
-
-    #[arg(long)]
-    product_id: Option<u16>,
-
-    // Subcommand
-    #[command(subcommand)]
-    command: CliCommand,
-
-    /// Set brightness
-    #[arg(short, long, default_value_t = Brightness::Full, value_enum)]
-    brightness: Brightness,
-}
+mod cli;
+use cli::{CliCommand, Opt};
+mod common;
 
 fn main() -> Result<()> {
     let opt = Opt::parse();
 
+    // Allow the usual hex specifiation (starting with 0x) for the product-id
+    let pid = common::get_u16_from_string(opt.product_id);
+
     // Search / init usb keyboard
-    let devices =
-        cherryrgb::find_devices(opt.product_id).context("Failed to find any cherry keyboard")?;
+    let devices = cherryrgb::find_devices(pid).context("Failed to find any cherry keyboard")?;
 
     if devices.len() > 1 {
         for (index, &dev) in devices.iter().enumerate() {

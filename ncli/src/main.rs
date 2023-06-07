@@ -1,72 +1,15 @@
-use std::{convert::TryFrom, io::Read, io::Write, path::PathBuf};
+use std::{convert::TryFrom, io::Read, io::Write};
 
 use anyhow::{Context, Result};
 use cherryrgb::{
     self, read_color_profile, rgb, Brightness, CustomKeyLeds, LightingMode, OwnRGB8, RpcAnimation,
     Speed,
 };
-use clap::{Parser, Subcommand};
+use clap::Parser;
 use std::os::unix::net::UnixStream;
 
-#[derive(Parser, Debug)]
-struct AnimationArgs {
-    /// Set LED mode
-    #[arg(value_enum)]
-    mode: LightingMode,
-
-    /// Set speed
-    #[arg(value_enum)]
-    speed: Speed,
-
-    /// Color (e.g ff00ff)
-    color: Option<OwnRGB8>,
-
-    /// Enable rainbow colors
-    #[arg(short, long)]
-    rainbow: bool,
-}
-
-#[derive(Parser, Debug)]
-struct CustomColorOptions {
-    colors: Vec<OwnRGB8>,
-}
-
-#[derive(Parser, Debug)]
-struct ColorProfileFileOptions {
-    file_path: PathBuf,
-}
-
-#[derive(Subcommand, Debug)]
-enum CliCommand {
-    Animation(AnimationArgs),
-    CustomColors(CustomColorOptions),
-    ColorProfileFile(ColorProfileFileOptions),
-}
-
-#[derive(Parser, Debug)]
-#[command(author, version, about, long_about = None)]
-struct Opt {
-    /// Enable debug output
-    #[arg(short, long)]
-    debug: bool,
-
-    #[arg(
-        name = "socket",
-        short,
-        long,
-        help = "Path of socket to connect.",
-        default_value = "/run/cherryrgb.sock"
-    )]
-    socket_path: String,
-
-    // Subcommand
-    #[command(subcommand)]
-    command: CliCommand,
-
-    /// Set brightness
-    #[arg(short, long, default_value_t = Brightness::Full, value_enum)]
-    brightness: Brightness,
-}
+mod ncli;
+use ncli::{CliCommand, Opt};
 
 struct UnixClient {
     sock: UnixStream,
