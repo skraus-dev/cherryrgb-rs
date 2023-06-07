@@ -41,6 +41,7 @@ pub enum LightingMode {
     #[strum(props(attr = "U"))]
     Rain = 0x0B, // Unofficial (looks like Matrix :D)
     #[strum(props(attr = ""))]
+    #[value(skip)]
     Custom = 0x08,
     #[strum(props(attr = "S"))]
     Rolling = 0x0A, // S
