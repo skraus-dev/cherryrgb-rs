@@ -20,6 +20,7 @@ env:
   DEBIAN_FRONTEND: noninteractive
   INSTDEPS: "apt-get update && apt-get install -y libclang-dev clang"
   RUSTFLAGS: "-C link-arg=-s"
+  CACHE_PREFIX: "${{ vars.CACHE_PREFIX }}"
 
 jobs:
   test:
@@ -157,9 +158,9 @@ jobs:
           ${{ env.CARGO_HOME }}/registry/index/
           ${{ env.CARGO_HOME }}/registry/cache/
           ${{ env.CARGO_HOME }}/git/db/
-        key: ${{ matrix.job.target }}-${{ hashFiles('Cargo.lock') }}
+        key: ${{ env.CACHE_PREFIX }}${{ matrix.job.target }}-${{ hashFiles('Cargo.lock') }}
         restore-keys: |
-          ${{ matrix.job.target }}
+          ${{ env.CACHE_PREFIX }}${{ matrix.job.target }}
         enableCrossOsArchive: true
     - name: Build native
       if: ${{ matrix.job.native }}
@@ -192,10 +193,12 @@ jobs:
           ${{ env.CARGO_HOME }}/registry/index/
           ${{ env.CARGO_HOME }}/registry/cache/
           ${{ env.CARGO_HOME }}/git/db/
-        key: ${{ matrix.job.target }}-${{ hashFiles('Cargo.lock') }}
+        key: ${{ env.CACHE_PREFIX }}${{ matrix.job.target }}-${{ hashFiles('Cargo.lock') }}
         restore-keys: |
-          ${{ matrix.job.target }}
+          ${{ env.CACHE_PREFIX }}${{ matrix.job.target }}
         enableCrossOsArchive: true
+    - name: Generate cmdline help/docs/completions
+      run: cargo xtask all
     - name: Collect artifacts
       shell: bash
       run: |
@@ -206,15 +209,15 @@ jobs:
                 path=target/${{ matrix.job.target }}/release/cherryrgb_${bin}
                 test -f ${path} && cp -av ${path} artifacts/bin/ || true
               done
-              miscfiles="*.md LICENSE service/etc udev docs examples"
+              miscfiles="*.md LICENSE service/etc udev docs examples target/generated/*"
             ;;
             *windows*)
               cp -av target/${{ matrix.job.target }}/release/cherryrgb_cli.exe artifacts/bin/
-              miscfiles="*.md LICENSE docs examples"
+              miscfiles="*.md LICENSE docs examples target/generated/*"
             ;;
             *)
               cp -av target/${{ matrix.job.target }}/release/cherryrgb_cli artifacts/bin/
-              miscfiles="*.md LICENSE docs examples"
+              miscfiles="*.md LICENSE docs examples target/generated/*"
             ;;
           esac
           cp -av ${miscfiles} artifacts/
