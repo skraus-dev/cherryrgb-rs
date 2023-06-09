@@ -221,8 +221,9 @@ jobs:
             ;;
           esac
           cp -av ${miscfiles} artifacts/
-          tgz=${{ matrix.assetprefix }}-${{ github.ref_name }}-${{ matrix.job.assetname }}.tar.gz
-          tar cvzCf artifacts ${tgz} .
+          afname="${{ matrix.assetprefix }}-${{ github.ref_name }}-${{ matrix.job.assetname }}"
+          mv artifacts "${afname}"
+          tar cvzf "${afname}.tar.gz" "${afname}"
           echo "${GITHUB_REF}" > github-ref
           echo "${GITHUB_SHA}" > commithash
     - name: Save artifacts
