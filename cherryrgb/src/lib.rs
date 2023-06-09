@@ -444,7 +444,7 @@ impl CherryKeyboard {
         {
             Ok(len) => {
                 // Bogus event data has bit 3 set in the 3rd byte
-                if len >= 3 && buf[2] >= 8 {
+                if (len >= 3 && buf[2] >= 8) || (len == 9 && buf[0] == 5) {
                     log::debug!(" - BOGUS read {} bytes: {:?} filtered", len, &buf[..len]);
                     return Ok(());
                 }
