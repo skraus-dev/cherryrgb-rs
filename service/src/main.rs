@@ -12,50 +12,13 @@ use std::sync::{Arc, Mutex};
 use std::{thread, time};
 use systemd_journal_logger::{connected_to_journal, JournalLog};
 
+mod service;
+use service::Opt;
+#[path = "../../src/common.rs"]
+mod common;
+
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 const NAME: &str = env!("CARGO_PKG_NAME");
-
-#[derive(Parser, Debug, Clone)]
-#[command(author, version, about, long_about = None)]
-struct Opt {
-    /// Enable debug output
-    #[arg(short, long)]
-    debug: bool,
-
-    #[arg(
-        short,
-        long,
-        help = "Must be specified if multiple cherry products are detected."
-    )]
-    product_id: Option<String>,
-
-    #[arg(
-        name = "socket",
-        short,
-        long,
-        help = "Path of listening socket to create.",
-        default_value = "/run/cherryrgb.sock"
-    )]
-    socket_path: String,
-
-    #[arg(
-        name = "socketmode",
-        short = 'm',
-        long,
-        help = "Permissions of the socket.",
-        default_value = "0664"
-    )]
-    socket_mode: String,
-
-    #[arg(
-        name = "socketgroup",
-        short = 'g',
-        long,
-        help = "Group of the socket.",
-        default_value = "root"
-    )]
-    socket_group: String,
-}
 
 /// Handle a single connection from cherryrgb_ncli
 /// Try to read command (and possible
@@ -218,16 +181,6 @@ fn socket_server(
     Ok(())
 }
 
-fn get_u16_from_string(pid: Option<String>) -> Option<u16> {
-    let cpid = pid.clone();
-    if let Some(stripped) = cpid?.strip_prefix("0x") {
-        let val = u16::from_str_radix(stripped, 16).ok()?;
-        return Some(val);
-    }
-    let val = pid?.as_str().parse::<u16>().ok()?;
-    Some(val)
-}
-
 fn main() -> Result<()> {
     let opt = Opt::parse();
 
@@ -262,7 +215,7 @@ fn main() -> Result<()> {
     let amutex = Arc::new(Mutex::new(0));
 
     // Allow the usual hex specifiation (starting with 0x) for the product-id
-    let pid = get_u16_from_string(opt.product_id);
+    let pid = common::get_u16_from_string(opt.product_id);
 
     // Search / init usb keyboard
     let devices = match cherryrgb::find_devices(pid) {

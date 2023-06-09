@@ -10,9 +10,10 @@ uhid = ["cherryrgb/uhid"]
 
 [workspace]
 members = [
-    "service",
+    "cherryrgb",
     "ncli",
-    "cherryrgb"
+    "service",
+    "xtask"
 ]
 
 [workspace.package]
