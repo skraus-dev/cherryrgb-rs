@@ -1,5 +1,6 @@
 use cherryrgb::{self, Brightness};
 use clap::Parser;
+use std::path::PathBuf;
 
 #[path = "../../src/commonargs.rs"]
 mod commonargs;
@@ -12,14 +13,9 @@ pub struct Opt {
     #[arg(short, long)]
     pub debug: bool,
 
-    #[arg(
-        name = "socket",
-        short,
-        long,
-        help = "Path of socket to connect.",
-        default_value = "/run/cherryrgb.sock"
-    )]
-    pub socket_path: String,
+    /// Path of socket to connect
+    #[arg(name = "socket", short, long, default_value = "/run/cherryrgb.sock")]
+    pub socket_path: PathBuf,
 
     // Subcommand
     #[command(subcommand)]

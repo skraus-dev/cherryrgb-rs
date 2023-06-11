@@ -1,3 +1,4 @@
+use std::path::PathBuf;
 use std::{convert::TryFrom, io::Read, io::Write};
 
 use anyhow::{Context, Result};
@@ -17,26 +18,24 @@ struct UnixClient {
 
 /// UnixClient resembles CherryKeyboard, but connects to service
 impl UnixClient {
-    pub fn new(path: String) -> Result<Self, anyhow::Error> {
-        let sock =
-            UnixStream::connect(path.clone()).context(format!("Could not connect to {path}"))?;
+    const ERR_WRITE: &str = "I/O error writing to socket";
+
+    pub fn new(path: PathBuf) -> Result<Self, anyhow::Error> {
+        let sock = UnixStream::connect(path.as_path())
+            .context(format!("Could not connect to {path:?}"))?;
         Ok(Self { sock })
     }
 
     /// Reset custom key colors to default
     pub fn reset_custom_colors(&mut self) -> Result<(), anyhow::Error> {
-        self.sock
-            .write_all("reset_custom_colors".as_bytes())
-            .context("I/O error writing to socket")?;
+        writeln!(self.sock, "reset_custom_colors").context(Self::ERR_WRITE)?;
         Ok(())
     }
 
     /// Set custom color for each individual key
     pub fn set_custom_colors(&mut self, key_leds: CustomKeyLeds) -> Result<(), anyhow::Error> {
         let json = serde_json::to_string(&key_leds).unwrap();
-        self.sock
-            .write_all(format!("set_custom_colors={}", json).as_bytes())
-            .context("I/O error writing to socket")?;
+        writeln!(self.sock, "set_custom_colors={}", json).context(Self::ERR_WRITE)?;
         Ok(())
     }
 
@@ -57,9 +56,7 @@ impl UnixClient {
             rainbow,
         };
         let json = serde_json::to_string(&rpc).unwrap();
-        self.sock
-            .write_all(format!("set_led_animation={}", json).as_bytes())
-            .context("I/O error writing to socket")?;
+        writeln!(self.sock, "set_led_animation={}", json).context(Self::ERR_WRITE)?;
         Ok(())
     }
 }
