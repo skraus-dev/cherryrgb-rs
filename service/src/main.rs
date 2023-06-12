@@ -4,9 +4,8 @@ use clap::Parser;
 use file_mode::ModePath;
 use log::LevelFilter;
 use nix::unistd::{chown, Group};
-use std::io::{Read, Write};
+use std::io::{BufRead, BufReader, BufWriter, Write};
 use std::os::unix::net::{UnixListener, UnixStream};
-use std::path::Path;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::{thread, time};
@@ -25,115 +24,120 @@ const NAME: &str = env!("CARGO_PKG_NAME");
 /// serialized parameters) from stream, then
 /// execute command and return the result.
 fn handle_client(
-    mut stream: UnixStream,
+    stream: UnixStream,
     keyboard: Arc<CherryKeyboard>,
     mutex: Arc<Mutex<u32>>,
 ) -> Result<()> {
-    let mut msg = String::new();
-    match stream.read_to_string(&mut msg) {
-        Ok(res) => res,
-        Err(err) => {
-            log::error!("Errror while receiving cmd: {:?}", err);
-            return Ok(());
-        }
-    };
-    if msg.starts_with("debug=on") {
-        log::set_max_level(LevelFilter::Debug);
-        return Ok(());
-    }
-    if msg.starts_with("debug=off") {
-        log::set_max_level(LevelFilter::Info);
-        return Ok(());
-    }
-    // Not really useful at the moment, because
-    // it just does logging, always returns an
-    // empty Ok Result and is not really required
-    // for LED-related operations.
-    /*
-    if msg.starts_with("fetch_device_state") {
-        let _guard = mutex.lock().unwrap();
-        match keyboard.fetch_device_state() {
-            Ok(res) => res,
-            Err(err) => {
-                let emsg = format!("Fetching device state failed: {:?}", err);
-                let _ = stream.write_all(emsg.as_bytes());
-                _ = stream.flush();
-                log::error!("{}", emsg);
-                return Ok(());
+    let reader = stream;
+    let writer = reader.try_clone()?;
+    let reader = BufReader::new(reader);
+    let mut writer = BufWriter::new(writer);
+    for cmd in reader.lines() {
+        match cmd {
+            Ok(cmd) => {
+                log::debug!("Got cmd: {:?}", cmd);
+                // Not really useful at the moment, because
+                // it just does logging, always returns an
+                // empty Ok Result and is not really required
+                // for LED-related operations.
+                /*
+                if cmd.starts_with("fetch_device_state") {
+                    let _guard = mutex.lock().unwrap();
+                    match keyboard.fetch_device_state() {
+                        Ok(res) => res,
+                        Err(err) => {
+                            let emsg = format!("Fetching device state failed: {:?}", err);
+                            let _ = writer.write_all(emsg.as_bytes());
+                            _ = stream.flush();
+                            log::error!("{}", emsg);
+                            return Ok(());
+                        }
+                    }
+                    return Ok(());
+                }
+                */
+                if cmd == "reset_custom_colors" {
+                    let _guard = mutex.lock().unwrap();
+                    match keyboard.reset_custom_colors() {
+                        Ok(res) => res,
+                        Err(err) => {
+                            let emsg = format!("Errror in reset_custom_colors: {:?}", err);
+                            let _ = writer.write_all(format!("{}\n", emsg).as_bytes());
+                            log::error!("{}", emsg);
+                            return Ok(());
+                        }
+                    }
+                    continue;
+                }
+                if let Some(stripped) = cmd.strip_prefix("loglevel=") {
+                    let maxlevel: log::LevelFilter = stripped.parse()?;
+                    log::set_max_level(maxlevel);
+                    continue;
+                }
+                if let Some(stripped) = cmd.strip_prefix("set_led_animation=") {
+                    let params = stripped;
+                    let args: RpcAnimation = match serde_json::from_str(params) {
+                        Ok(res) => res,
+                        Err(err) => {
+                            log::error!(
+                                "Unable to deserialize params for set_led_animation {:?}",
+                                err
+                            );
+                            return Ok(());
+                        }
+                    };
+                    let color = args.color.unwrap_or(rgb::RGB8::new(255, 255, 255).into());
+                    let _guard = mutex.lock().unwrap();
+                    match keyboard.set_led_animation(
+                        args.mode,
+                        args.brightness,
+                        args.speed,
+                        color,
+                        args.rainbow,
+                    ) {
+                        Ok(res) => res,
+                        Err(err) => {
+                            let emsg = format!("Errror in set_led_animation: {:?}", err);
+                            let _ = writer.write_all(emsg.as_bytes());
+                            log::error!("{}", emsg);
+                            return Ok(());
+                        }
+                    }
+                    continue;
+                }
+                if let Some(stripped) = cmd.strip_prefix("set_custom_colors=") {
+                    let params = stripped;
+                    let key_leds: CustomKeyLeds = match serde_json::from_str(params) {
+                        Ok(res) => res,
+                        Err(err) => {
+                            log::error!(
+                                "Unable to deserialize params for set_custom_colors {:?}",
+                                err
+                            );
+                            return Ok(());
+                        }
+                    };
+                    let _guard = mutex.lock().unwrap();
+                    match keyboard.set_custom_colors(key_leds) {
+                        Ok(res) => res,
+                        Err(err) => {
+                            let emsg = format!("Errror in set_set_custom_colors: {:?}", err);
+                            let _ = writer.write_all(emsg.as_bytes());
+                            log::error!("{}", emsg);
+                            return Ok(());
+                        }
+                    }
+                    continue;
+                }
+                log::warn!("received invalid cmd: {:?}", cmd.trim());
+                continue;
             }
-        }
-        return Ok(());
-    }
-    */
-    if msg.starts_with("reset_custom_colors") {
-        let _guard = mutex.lock().unwrap();
-        match keyboard.reset_custom_colors() {
-            Ok(res) => res,
             Err(err) => {
-                let emsg = format!("Errror in reset_custom_colors: {:?}", err);
-                let _ = stream.write_all(format!("{}\n", emsg).as_bytes());
-                log::error!("{}", emsg);
-                return Ok(());
-            }
-        }
-        return Ok(());
-    }
-    if let Some(stripped) = msg.strip_prefix("set_led_animation=") {
-        let params = stripped;
-        let args: RpcAnimation = match serde_json::from_str(params) {
-            Ok(res) => res,
-            Err(err) => {
-                log::error!(
-                    "Unable to deserialize params for set_led_animation {:?}",
-                    err
-                );
+                log::error!("Errror while receiving cmd: {:?}", err);
                 return Ok(());
             }
         };
-        let color = args.color.unwrap_or(rgb::RGB8::new(255, 255, 255).into());
-        let _guard = mutex.lock().unwrap();
-        match keyboard.set_led_animation(
-            args.mode,
-            args.brightness,
-            args.speed,
-            color,
-            args.rainbow,
-        ) {
-            Ok(res) => res,
-            Err(err) => {
-                let emsg = format!("Errror in set_led_animation: {:?}", err);
-                let _ = stream.write_all(emsg.as_bytes());
-                log::error!("{}", emsg);
-                return Ok(());
-            }
-        }
-        return Ok(());
     }
-    if let Some(stripped) = msg.strip_prefix("set_custom_colors=") {
-        let params = stripped;
-        let key_leds: CustomKeyLeds = match serde_json::from_str(params) {
-            Ok(res) => res,
-            Err(err) => {
-                log::error!(
-                    "Unable to deserialize params for set_custom_colors {:?}",
-                    err
-                );
-                return Ok(());
-            }
-        };
-        let _guard = mutex.lock().unwrap();
-        match keyboard.set_custom_colors(key_leds) {
-            Ok(res) => res,
-            Err(err) => {
-                let emsg = format!("Errror in set_set_custom_colors: {:?}", err);
-                let _ = stream.write_all(emsg.as_bytes());
-                log::error!("{}", emsg);
-                return Ok(());
-            }
-        }
-        return Ok(());
-    }
-    log::warn!("received invalid cmd: {:?}", msg.as_str().trim());
     Ok(())
 }
 
@@ -143,10 +147,10 @@ fn socket_server(
     keyboard: Arc<CherryKeyboard>,
     mutex: Arc<Mutex<u32>>,
 ) -> Result<()> {
-    log::debug!("Listening on {}", opt.socket_path);
+    log::debug!("Listening on {:?}", opt.socket_path);
     let listener = UnixListener::bind(opt.socket_path.clone())?;
     let mode = u32::from_str_radix(&opt.socket_mode, 8).unwrap();
-    let spath = Path::new(opt.socket_path.as_str());
+    let spath = opt.socket_path.as_path();
     spath.set_mode(mode).unwrap();
     let group = Group::from_name(opt.socket_group.as_str())
         .unwrap()
@@ -160,7 +164,7 @@ fn socket_server(
             Ok(stream) => {
                 // connection succeeded
                 if keep_running.load(Ordering::SeqCst) {
-                    log::debug!("Got connection on {}", opt.socket_path);
+                    log::debug!("Got connection on {:?}", opt.socket_path);
                     let keyboard_clone = Arc::clone(&keyboard);
                     let mutex_clone = Arc::clone(&mutex);
                     let tb = thread::Builder::new().name("handle_client".into());

@@ -1,4 +1,5 @@
 use clap::Parser;
+use std::path::PathBuf;
 
 #[derive(Parser, Debug, Clone)]
 #[command(name = "cherryrgb_service", author, version, about = "Service daemon and UHID driver for Cherry RGB Keyboard", long_about = None)]
@@ -13,7 +14,7 @@ pub struct Opt {
 
     /// Path of listening socket to create
     #[arg(name = "socket", short, long, default_value = "/run/cherryrgb.sock")]
-    pub socket_path: String,
+    pub socket_path: PathBuf,
 
     /// Permissions of the socket (octal)
     #[arg(name = "socketmode", short = 'm', long, default_value = "0664")]
