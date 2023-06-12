@@ -250,7 +250,7 @@ where
 }
 
 /// Wrapper around custom LED color for all keys
-#[derive(Default, Debug, Serialize, Deserialize)]
+#[derive(Default, Debug, Clone, Serialize, Deserialize)]
 pub struct CustomKeyLeds {
     key_leds: Vec<OwnRGB8>,
 }
@@ -300,9 +300,7 @@ impl TryFrom<Vec<ProfileKey>> for CustomKeyLeds {
     fn try_from(value: Vec<ProfileKey>) -> std::result::Result<Self, Self::Error> {
         let mut custom_keys = Self::new();
 
-        for key_rgb in value {
-            custom_keys.set_led(key_rgb.key_index, key_rgb.rgb_value)?;
-        }
+        custom_keys = custom_keys.modify_from(value)?;
 
         Ok(custom_keys)
     }
@@ -366,6 +364,14 @@ impl CustomKeyLeds {
             .collect();
 
         Ok(result)
+    }
+
+    /// Modify existing values from a vector of `ProfileKey`.
+    pub fn modify_from(mut self, value: Vec<ProfileKey>) -> Result<Self, CherryRgbError> {
+        for key_rgb in value {
+            self.set_led(key_rgb.key_index, key_rgb.rgb_value)?;
+        }
+        Ok(self)
     }
 }
 

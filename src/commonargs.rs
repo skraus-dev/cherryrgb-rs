@@ -23,11 +23,17 @@ pub struct AnimationArgs {
 
 #[derive(Parser, Debug)]
 pub struct CustomColorOptions {
+    /// One or more RGB color specs (6-digit hex numbers)
     pub colors: Vec<OwnRGB8>,
 }
 
 #[derive(Parser, Debug)]
 pub struct ColorProfileFileOptions {
+    /// If enabled, modifies existing color profile
+    #[arg(short, long = "keep-existing-colors")]
+    pub keep_existing: bool,
+
+    /// A json encoded file, specifying key colors
     pub file_path: PathBuf,
 }
 

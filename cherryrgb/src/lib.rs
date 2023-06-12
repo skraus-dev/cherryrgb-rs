@@ -786,4 +786,46 @@ mod tests {
         let profile_keys = read_color_profile(color_profile).expect("Failed reading color profile");
         assert_eq!(match_this, profile_keys);
     }
+
+    #[test]
+    fn test_modify_from() {
+        let mut cleds = CustomKeyLeds::new();
+        _ = cleds.set_led(
+            0,
+            RGB8 {
+                r: 0x11,
+                g: 0x11,
+                b: 0x11,
+            },
+        );
+        _ = cleds.set_led(
+            4,
+            RGB8 {
+                r: 0xee,
+                g: 0xee,
+                b: 0xee,
+            },
+        );
+
+        let color_profile = r#"
+            {
+                "1": "ff0000",
+                "2": "00ff00",
+                "3": "0000ff"
+            }
+        "#;
+        let profile_keys = read_color_profile(color_profile).expect("Failed reading color profile");
+        let cleds = cleds.modify_from(profile_keys).unwrap();
+        let first = cleds.get_payloads().unwrap().remove(0);
+        let expected = Payload::SetCustomLED {
+            data_offset: 0,
+            padding: 0,
+            key_leds_data: vec![
+                0x11, 0x11, 0x11, 0xff, 0, 0, 0, 0xff, 0, 0, 0, 0xff, 0xee, 0xee, 0xee, 0, 0, 0, 0,
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 0, 0, 0, 0, 0, 0,
+            ],
+        };
+        assert_eq!(first.to_vec(), expected.to_vec());
+    }
 }
