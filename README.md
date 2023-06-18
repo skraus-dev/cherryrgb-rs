@@ -203,6 +203,18 @@ This project is not affiliated or endorsed by Cherry GmbH.
 
 ## Changelog
 
+### v0.2.8 - 18/06/2023
+
+* deps: Migrated from StructOpt+clap v2.x to clap v4.x.
+* Fixed #52
+* Added xtask for generating docs, manpages and shell completion scripts
+* Added woraround in service for handling newer Firmware 0105
+* Refactored socket I/O and command handling in service
+* Implemented `--keep-existing-colors` option for `color-profile-file` subcommand (fixes #14)
+* Relaxed parsing of color-profiles
+  * Allow comments using `//`
+  * Allow trailing comma after last key-value pair
+
 ### v0.2.7 - 03/06/2023
 
 * deps: Bump binrw to v0.11.2 (thx @felfert once again :))
