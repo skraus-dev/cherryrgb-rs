@@ -12,6 +12,9 @@ use std::os::unix::net::UnixStream;
 mod ncli;
 use ncli::{CliCommand, Opt};
 
+#[path = "../../src/state.rs"]
+mod state;
+
 struct UnixClient {
     sock: UnixStream,
 }
@@ -85,24 +88,39 @@ fn main() -> Result<()> {
             keyboard.set_custom_colors(keys)?;
         }
         CliCommand::ColorProfileFile(args) => {
-            let path_str = args
-                .file_path
-                .to_str()
-                .map_or(String::new(), |p| p.to_string());
-
             let mut f = std::fs::File::open(&args.file_path)
-                .context(format!("color profile '{path_str}'"))?;
+                .context(format!("color profile {:?}", args.file_path))?;
             let mut json: String = String::new();
 
             f.read_to_string(&mut json)?;
 
+            // Allow // comments
+            let re = regex::RegexBuilder::new(r"//.*?$")
+                .multi_line(true)
+                .build()
+                .unwrap();
+            json = re.replace_all(&json, "").to_string();
+            // Allow trailing comma after last element
+            let re = regex::RegexBuilder::new(r",(\s*\})").build().unwrap();
+            json = re.replace_all(&json, "$1").to_string();
+
+            log::debug!("{json}");
+
             let colors_from_file =
                 read_color_profile(&json).context("reading colors from color file")?;
 
-            let keys =
-                CustomKeyLeds::try_from(colors_from_file).context("assembling custom key leds")?;
-
-            keyboard.set_custom_colors(keys)?;
+            if args.keep_existing {
+                let keys = state::load()?
+                    .modify_from(colors_from_file)
+                    .context("assembling custom key leds")?;
+                keyboard.set_custom_colors(keys.clone())?;
+                state::save(keys)?;
+            } else {
+                let keys = CustomKeyLeds::try_from(colors_from_file)
+                    .context("assembling custom key leds")?;
+                keyboard.set_custom_colors(keys.clone())?;
+                state::save(keys)?;
+            }
         }
         CliCommand::Animation(args) => {
             let color = args.color.unwrap_or(rgb::RGB8::new(255, 255, 255).into());

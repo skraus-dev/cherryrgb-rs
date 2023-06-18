@@ -1,3 +1,4 @@
+/// Parse a string with optional hex prefix 0x
 pub fn get_u16_from_string(pid: Option<String>) -> Option<u16> {
     let cpid = pid.clone();
     if let Some(stripped) = cpid?.strip_prefix("0x") {
