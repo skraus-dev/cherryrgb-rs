@@ -40,30 +40,38 @@ Check out [UHID Driver documentation](./docs/UHID-driver.md) on how to install a
 
 ## CLI
 
-Get usage help
+Documentation for the CLI is now generated in separate files:
 
-```shell
-# Top level
-./cherryrgb_cli --help
+* [cherryrgb_cli](docs/cherryrgb_cli.md)
 
-# For each command
-./cherryrgb_cli animation --help
-./cherryrgb_cli custom-colors --help
-```
-### Alternative CLI and service for Linux
+Alternative  CLI and service for Linux
 
-See [this](docs/UHID-driver.md) doc.
+* [cherryrgb_ncli](docs/cherryrgb_ncli.md)
+* [cherryrgb_service](docs/cherryrgb_service.md)
+
+## Usage examples and remarks
 
 ### Set LED animation
 
 * Color: #00ff00 (green)
-* Mode: Rain
-* Speed: slow
+* Mode: wave
+* Speed: fast
 * Brightness: medium
 
 ```shell
-./cherryrgb_cli --brightness medium animation rain slow 00ff00
+./cherryrgb_cli --brightness medium animation wave fast 00ff00
 ```
+
+#### Unofficial animation modes
+
+Please note, that the following modes are unofficial and therefore are not guaranteed to work
+properly:
+
+* `radar`
+* `vortex`
+* `fire`
+* `stars`
+* `rain`
 
 ### Set custom key colors
 
@@ -90,15 +98,33 @@ Color profile file structure:
 }
 ```
 
-A profile file is a JSON file that contains a root object and a key value pair for each key.
-
-Each key is identified by its index. The colors are specified using hexadecimal color codes.
+A profile file is a JSON file that contains a root object and a key value pair for each key. Both key and value *MUST* be strings. The JSON parser now has ben changed slightly to allow for 2 normally unsupported variations:
+* C99-style comments (Starting at `//` until the end of a line).
+* A trailing comma (after the last key value pair) is ignored.
+Each key is identified by its index. The colors are specified using hexadecimal color codes. The maximum usable
+index is 124 (currently hardcoded).
 
 Example:
 
 ```shell
 ./cherryrgb_cli --brightness full color-profile-file {FILE PATH}
 ```
+
+Example `bash` script, demonstrating the new `--keep-existing-colors` feature:
+```shell
+#!/bin/bash
+cherryrgb_cli color-profile-file examples/static_rainbow.json
+for i in 1 2 3 4 5 ; do
+    sleep 0.5
+    cherryrgb_cli color-profile-file -k examples/white_f12.json
+    sleep 0.5
+    cherryrgb_cli color-profile-file -k examples/red_f12.json
+done
+```
+**Note:**
+Because existing colors cannot be read from the keyboard, they are stored in a local cache
+after setting them. Therfore, in order to use this feature, the command `color-profile-file`
+has to be invoked at least once before.
 
 ## Build from source
 
@@ -112,9 +138,30 @@ Example:
 git clone https://github.com/skraus-dev/cherryrgb-rs.git
 cd cherryrgb-rs
 cargo build
+cargo xtask all
 ```
+For a **complete** build on Linux, you can append `--all-features --all` to the `cargo build` line.
 
 Now you can run the binary from `./target/debug/cherryrgb_cli`
+
+### Generated documentation and shell completion scripts
+
+When running the above command `cargo xtask all`, a directory hierarchy
+is generated:
+```
+target/generated/docs/
+                 man/
+                 completions\
+```
+which contain:
+- Markup documentation
+- Unix man pages. Copy those into your [manpath](https://man7.org/linux/man-pages/man1/manpath.1.html), where
+the extension of each file indicates the man secrion (usually a subdirectory named `man1`, `man8` etc.)
+- Shell completion scripts for `bash`, `elvish`, `fish`, `powershell` and `zsh`.
+To use the completion scripts, you mus copy them to the appropriate location
+(which depends both on your shell and system). For example, on Fedora, the bash
+completion scripts go into `/etc/bash_completion.d/`. Refer to the documentation
+of your shell/system.
 
 ## Install through package manager
 
