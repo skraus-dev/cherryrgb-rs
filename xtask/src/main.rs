@@ -10,11 +10,8 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use clap::{Command, CommandFactory};
-use clap_complete::{
-    generate_to,
-    Shell::{Bash, Elvish, Fish, PowerShell, Zsh},
-};
+use clap::{Command, CommandFactory, ValueEnum};
+use clap_complete::{generate_to, Shell};
 
 #[path = "../../src/cli.rs"]
 mod cli;
@@ -73,7 +70,7 @@ fn print_generated(path: &Path) {
 }
 
 fn gen_for_all_shells(cmd: &mut Command, dir: &Path) -> Result<(), DynError> {
-    for shell in [Bash, Elvish, Fish, PowerShell, Zsh] {
+    for &shell in Shell::value_variants() {
         let path = generate_to(shell, cmd, cmd.get_name().to_string(), dir)?;
         print_generated(&path);
     }
