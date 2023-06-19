@@ -140,7 +140,11 @@ cd cherryrgb-rs
 cargo build
 cargo xtask all
 ```
-For a **complete** build on Linux, you can append `--all-features --all` to the `cargo build` line.
+For a **complete** build on Linux (including service and alternative cli), you can do the following:
+- install 2 additional native dependencies:
+  * On Ubuntu or Debian: `sudo apt-get update && sudo apt-get install -y libclang-dev clang`
+  * On Fedora: `sudo dnf install -y llvm-devel clang-devel`
+- append `--all-features --all` to the`cargo build line
 
 Now you can run the binary from `./target/debug/cherryrgb_cli`
 
