@@ -80,8 +80,8 @@ pub use vkbd::VirtKbd;
 /// USB Vendor ID - Cherry GmbH
 pub const CHERRY_USB_VID: u16 = 0x046a;
 
-const INTERFACE_NUM: u8 = 1;
-const INTERRUPT_EP: u8 = 0x82;
+const DEFAULT_INTERFACE_NUM: u8 = 1;
+const DEFAULT_INTERRUPT_EP: u8 = 0x82;
 static TIMEOUT: Duration = Duration::from_millis(1000);
 #[cfg(all(target_os = "linux", feature = "uhid"))]
 static SHORT_TIMEOUT: Duration = Duration::from_millis(100);
@@ -196,6 +196,8 @@ pub fn read_color_profile(color_profile: &str) -> Result<Vec<ProfileKey>, Cherry
 /// Holds a handle to the USB keyboard device
 pub struct CherryKeyboard {
     device_handle: rusb::DeviceHandle<rusb::Context>,
+    interface_num: u8,
+    interrupt_ep: u8,
 }
 
 impl CherryKeyboard {
@@ -225,9 +227,39 @@ impl CherryKeyboard {
         );
 
         assert_eq!(device_desc.num_configurations(), 1);
-        assert_eq!(config_desc.num_interfaces(), 2);
 
-        // This should find 2 endpoints with Interrupt inputs
+        let num_interfaces = config_desc.num_interfaces();
+        log::debug!("Device has {} interface(s)", num_interfaces);
+
+        // Determine the correct interface and interrupt endpoint.
+        // Wired keyboards typically have 2 interfaces (HID keyboard on 0, vendor on 1).
+        // Wireless keyboards connected via USB may expose only 1 interface.
+        let mut interface_num = DEFAULT_INTERFACE_NUM;
+        let mut interrupt_ep = DEFAULT_INTERRUPT_EP;
+
+        if num_interfaces == 1 {
+            // Single-interface device: use interface 0 and find its interrupt IN endpoint
+            interface_num = 0;
+            if let Some(iface) = config_desc.interfaces().next() {
+                if let Some(desc) = iface.descriptors().next() {
+                    for ep in desc.endpoint_descriptors() {
+                        if ep.direction() == rusb::Direction::In
+                            && ep.transfer_type() == rusb::TransferType::Interrupt
+                        {
+                            interrupt_ep = ep.address();
+                            break;
+                        }
+                    }
+                }
+            }
+            log::debug!(
+                "Single-interface device: using interface={}, endpoint=0x{:02x}",
+                interface_num,
+                interrupt_ep
+            );
+        }
+
+        // Log all interrupt IN endpoints for debugging
         for interface in config_desc.interfaces() {
             for interface_desc in interface.descriptors() {
                 for endpoint_desc in interface_desc.endpoint_descriptors() {
@@ -256,10 +288,14 @@ impl CherryKeyboard {
         }
 
         device_handle
-            .claim_interface(INTERFACE_NUM)
+            .claim_interface(interface_num)
             .map_err(|e| CherryRgbError::UsbError("Failed to claim interface".into(), e))?;
 
-        Ok(Self { device_handle })
+        Ok(Self {
+            device_handle,
+            interface_num,
+            interrupt_ep,
+        })
     }
 
     /// Writes a control packet first, then reads interrupt packet
@@ -278,10 +314,10 @@ impl CherryKeyboard {
                     rusb::RequestType::Class,
                     rusb::Recipient::Interface,
                 ),
-                0x09,          // Request - SET_REPORT
-                0x0204,        // Value - ReportId: 4, ReportType: Output
-                0x0001,        // Index
-                &packet_bytes, // Data
+                0x09,                      // Request - SET_REPORT
+                0x0204,                    // Value - ReportId: 4, ReportType: Output
+                self.interface_num as u16, // Index
+                &packet_bytes,             // Data
                 TIMEOUT,
             )
             .map_err(|err| CherryRgbError::UsbError("Control Write failure".into(), err))?;
@@ -294,8 +330,8 @@ impl CherryKeyboard {
 
         self.device_handle
             .read_interrupt(
-                INTERRUPT_EP,  // Endpoint
-                &mut response, // read buffer
+                self.interrupt_ep, // Endpoint
+                &mut response,     // read buffer
                 TIMEOUT,
             )
             .map_err(|err| CherryRgbError::UsbError("Interrupt read failure".into(), err))?;
@@ -440,7 +476,7 @@ impl CherryKeyboard {
         let mut buf = [0; 64];
         match self
             .device_handle
-            .read_interrupt(INTERRUPT_EP, &mut buf, SHORT_TIMEOUT)
+            .read_interrupt(self.interrupt_ep, &mut buf, SHORT_TIMEOUT)
         {
             Ok(len) => {
                 // Bogus event data has bit 3 set in the 3rd byte
