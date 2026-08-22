@@ -106,7 +106,7 @@ jobs:
           buildopts: "--all --features uhid"
           installdeps: true
           native: true
-        - os: macos-26-intel
+        - os: macos-latest-intel
           assetname: macos-x86_64
           target: x86_64-apple-darwin
           buildopts: ""
