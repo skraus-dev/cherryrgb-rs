@@ -14,6 +14,10 @@ on:
       - '**/*.md'
       - '.github/**/*'
   workflow_dispatch:
+    inputs:
+      ghrelease:
+        type: boolean
+        description: Perform github release
 
 env:
   CARGO_TERM_COLOR: always
@@ -235,7 +239,7 @@ jobs:
     - name: Save artifacts
       uses: actions/upload-artifact@v7
       with:
-        name: cherryrgb-rs
+        name: "${{ matrix.job.assetname }}"
         path: |
           github-ref
           commithash
@@ -249,3 +253,10 @@ jobs:
     secrets: inherit
     with:
       artifact-id: cherryrgb-rs
+
+  manual-deploy:
+    name: Manual
+    if: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.ghrelease }}
+    needs: [build]
+    uses: ./.github/workflows/ghrelease.yml
+    secrets: inherit
