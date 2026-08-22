@@ -560,6 +560,7 @@ mod tests {
 
     use super::*;
     use binrw::BinReaderExt;
+    #[allow(deprecated)]
     use rgb::{ComponentSlice, RGB8};
     use std::io::Cursor;
 
@@ -636,6 +637,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(deprecated)]
     fn serialize_rgb8() {
         #[rustfmt::skip]
         assert_eq!(RGB8 {r: 232,g: 211,b: 75}.as_slice(),&[232, 211, 75]);
