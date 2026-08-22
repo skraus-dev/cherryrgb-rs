@@ -205,7 +205,7 @@ impl CherryKeyboard {
 
         let mut device_handle = ctx
             .open_device_with_vid_pid(vendor_id, product_id)
-            .ok_or_else(|| CherryRgbError::DeviceNotFoundError)?;
+            .ok_or(CherryRgbError::DeviceNotFoundError)?;
 
         let device = device_handle.device();
         let device_desc = device

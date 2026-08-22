@@ -3,6 +3,7 @@ use clap::Parser;
 
 #[path = "commonargs.rs"]
 mod commonargs;
+#[allow(unused_imports)]
 pub use commonargs::{AnimationArgs, CliCommand, ColorProfileFileOptions, CustomColorOptions};
 
 #[derive(Parser, Debug)]
