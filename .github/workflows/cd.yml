@@ -15,7 +15,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - name: Fetch artifacts
-      uses: actions/download-artifact@v3
+      uses: actions/download-artifact@v8
       with:
         name: ${{ inputs.artifact-id }}
     - name: Calculate checksums
@@ -38,6 +38,6 @@ jobs:
     if: ${{ github.ref_type == 'tag' || github.event_name == 'workflow_dispatch' }}
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v7
       - name: Publish crate
         run: cargo publish -p cherryrgb --token ${{ secrets.CARGO_API_KEY }}
