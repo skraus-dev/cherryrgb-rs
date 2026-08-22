@@ -4,7 +4,7 @@ use crate::{
     CherryRgbError, CHUNK_SIZE, TOTAL_KEYS,
 };
 
-use binrw::{binrw, until_eof, BinRead, BinWrite, BinWriterExt, Endian};
+use binrw::{binrw, helpers::until_eof, BinRead, BinWrite, BinWriterExt, Endian};
 use clap::ValueEnum;
 use serde::{Deserialize, Serialize};
 use std::convert::TryFrom;
@@ -64,6 +64,7 @@ pub enum LightingMode {
 #[binrw]
 #[brw(repr = u8)]
 #[derive(Eq, PartialEq, Debug, Serialize, Deserialize)]
+#[allow(dead_code)]
 pub enum UsbPollingRate {
     Low,    // 125Hz
     Medium, // 250 Hz

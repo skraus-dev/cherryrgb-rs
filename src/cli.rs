@@ -3,7 +3,7 @@ use clap::Parser;
 
 #[path = "commonargs.rs"]
 mod commonargs;
-pub use commonargs::{AnimationArgs, CliCommand, ColorProfileFileOptions, CustomColorOptions};
+pub use commonargs::CliCommand;
 
 #[derive(Parser, Debug)]
 #[command(name = "cherryrgb_cli", author, version, about = "Test tool for Cherry RGB Keyboard", long_about = None)]

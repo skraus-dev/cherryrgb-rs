@@ -203,9 +203,10 @@ impl CherryKeyboard {
     pub fn new(vendor_id: u16, product_id: u16) -> Result<Self, CherryRgbError> {
         let ctx = rusb::Context::new()?;
 
+        #[allow(unused_mut)]
         let mut device_handle = ctx
             .open_device_with_vid_pid(vendor_id, product_id)
-            .ok_or_else(|| CherryRgbError::DeviceNotFoundError)?;
+            .ok_or(CherryRgbError::DeviceNotFoundError)?;
 
         let device = device_handle.device();
         let device_desc = device

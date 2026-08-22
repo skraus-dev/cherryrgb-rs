@@ -4,7 +4,7 @@ use std::path::PathBuf;
 
 #[path = "../../src/commonargs.rs"]
 mod commonargs;
-pub use commonargs::{AnimationArgs, CliCommand, ColorProfileFileOptions, CustomColorOptions};
+pub use commonargs::CliCommand;
 
 #[derive(Parser, Debug)]
 #[command(name = "cherryrgb_ncli", author, version, about = "Client for service-based Cherry RGB Keyboard", long_about = None)]
