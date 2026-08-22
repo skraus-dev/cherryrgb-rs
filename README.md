@@ -207,6 +207,11 @@ This project is not affiliated or endorsed by Cherry GmbH.
 
 ## Changelog
 
+### v0.2.9 - 22/08/2026
+
+* deps: Upgraded binrw to 0.15.2 fixing warnings with current stable toolchain
+* Fixed #62 - Thanks to @gandhiano This adds support for wireless keyboards (e.g. MX 8.2 TKL Wireless, MX 3.0S Wireless)
+
 ### v0.2.8 - 18/06/2023
 
 * deps: Migrated from StructOpt+clap v2.x to clap v4.x.
