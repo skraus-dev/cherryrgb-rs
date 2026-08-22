@@ -108,7 +108,7 @@ jobs:
           native: true
         - os: macos-latest
           assetname: macos-arm64
-          target: arm64-apple-darwin
+          target: aarch64-apple-darwin
           buildopts: ""
           installdeps: false
           native: true
