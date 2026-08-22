@@ -28,7 +28,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v7
       - name: Install build dependencies
         run: sudo sh -c "${{ env.INSTDEPS }}"
       - run: cargo test --all-features --workspace
@@ -38,7 +38,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v7
       - name: Check formatting
         run: cargo fmt --all -- --check
 
@@ -47,7 +47,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v7
       - name: Install build dependencies
         run: sudo sh -c "${{ env.INSTDEPS }}"
       - name: Clippy check
@@ -58,7 +58,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v7
       - name: Install build dependencies
         run: sudo sh -c "${{ env.INSTDEPS }}"
       - name: Check documentation
@@ -71,7 +71,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v7
       - name: Publish dry-run
         run: cargo publish -p cherryrgb --dry-run
 
@@ -81,7 +81,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v7
       - run: cargo fetch --locked
 
   clean:
@@ -107,6 +107,12 @@ jobs:
           installdeps: true
           native: true
         - os: macos-latest
+          assetname: macos-arm64
+          target: aarch64-apple-darwin
+          buildopts: ""
+          installdeps: false
+          native: true
+        - os: macos-26-intel
           assetname: macos-x86_64
           target: x86_64-apple-darwin
           buildopts: ""
@@ -140,7 +146,7 @@ jobs:
     name: Build for ${{ matrix.job.target }}
     steps:
     - name: Checkout
-      uses: actions/checkout@v3
+      uses: actions/checkout@v7
     - name: Initialize CARGO_HOME
       shell: bash
       # The following must be set from within a shell, because HOME is not preset in a github runner context.
@@ -150,7 +156,7 @@ jobs:
       if: ${{ matrix.job.installdeps && matrix.job.native }}
       run: sudo sh -c "${{ env.INSTDEPS }}"
     - name: Retrieve target cache
-      uses: actions/cache@v3
+      uses: actions/cache@v6
       with:
         path: |
           target
@@ -185,7 +191,7 @@ jobs:
       run: |
         ${{ env.CARGO_HOME }}/bin/cross build --release --target ${{ matrix.job.target }} ${{ matrix.job.buildopts }}
     - name: Update target cache
-      uses: actions/cache@v3
+      uses: actions/cache@v6
       with:
         path: |
           target
@@ -227,7 +233,7 @@ jobs:
           echo "${GITHUB_REF}" > github-ref
           echo "${GITHUB_SHA}" > commithash
     - name: Save artifacts
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v7
       with:
         name: cherryrgb-rs
         path: |
