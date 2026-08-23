@@ -5,7 +5,7 @@ edition.workspace = true
 publish.workspace = true
 
 [dependencies]
-anstream = "0.6.0"
+anstream = "1.0.0"
 cargo_toml = "0.22.0"
 cherryrgb = { path = "../cherryrgb" }
 clap = { version = "4.3.1", features = ["derive"] }
