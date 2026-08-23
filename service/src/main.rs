@@ -192,7 +192,8 @@ fn main() -> Result<()> {
         // If the output streams of this process are directly connected to the
         // systemd journal log directly to the journal to preserve structured
         // log entries (e.g. proper multiline messages, metadata fields, etc.)
-        JournalLog::default()
+        JournalLog::new()
+            .unwrap()
             .with_extra_fields(vec![("VERSION", env!("CARGO_PKG_VERSION"))])
             .with_syslog_identifier("cherryrgb".to_string())
             .install()

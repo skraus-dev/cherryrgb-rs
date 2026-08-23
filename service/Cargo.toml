@@ -15,7 +15,7 @@ serde_json = "1.0.96"
 rgb = { version = "0.8", features = ["serde"] }
 file-mode = "0.1.2"
 nix = "0.26.2"
-systemd-journal-logger = "1.0.0"
+systemd-journal-logger = "2.0.0"
 
 [dependencies.simple_logger]
 version = "5.0"
