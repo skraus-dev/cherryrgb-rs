@@ -57,6 +57,31 @@ jobs:
       - name: Clippy check
         run: cargo clippy --all-targets --all-features --workspace -- -D warnings
 
+  audit:
+    name: Audit
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+      - name: Install build dependencies
+        run: sudo sh -c "${{ env.INSTDEPS }}"
+      - name: Check cargo-audit version
+        shell: bash
+        run: |
+          echo "CAV=$(CARGO_TERM_COLOR=never cargo info cargo-audit | awk '/^version:/ {print $2 }')" >> "$GITHUB_ENV"
+      - name: Retrieve audit cache
+        uses: actions/cache@v6
+        with:
+          key: cargo-audit-${{ env.CAV }}
+          path: |
+            /home/runner/.cargo/bin/cargo-audit
+            /home/runner/.cargo/advisory-db*
+            /home/runner/.cargo/.crates*
+      - name: Install audit
+        run: cargo install cargo-audit
+      - name: Run audit
+        run: cargo audit
+
   docs:
     name: Docs
     runs-on: ubuntu-latest
@@ -91,7 +116,7 @@ jobs:
   clean:
     if: ${{ github.event_name != 'pull_request' }} # If this is a pull request, stop here
     name: Clean before matrix build
-    needs: [test, clippy, rustfmt, docs, publish-dry-run]
+    needs: [test, clippy, rustfmt, docs, publish-dry-run, audit]
     runs-on: ubuntu-latest
     steps:
       - name: Clean target
