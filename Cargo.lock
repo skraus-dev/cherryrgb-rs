@@ -209,7 +209,7 @@ dependencies = [
  "serde_json",
  "strum",
  "strum_macros",
- "thiserror 1.0.39",
+ "thiserror 2.0.20",
  "uhid-virt",
 ]
 
