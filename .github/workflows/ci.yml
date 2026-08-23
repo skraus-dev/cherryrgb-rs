@@ -251,8 +251,6 @@ jobs:
     name: Call
     uses: ./.github/workflows/cd.yml
     secrets: inherit
-    with:
-      artifact-id: cherryrgb-rs
 
   manual-deploy:
     name: Manual
