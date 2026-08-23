@@ -595,7 +595,7 @@ mod tests {
 
     use super::*;
     use binrw::BinReaderExt;
-    use rgb::{ComponentSlice, RGB8};
+    use rgb::{bytemuck::cast_slice, RGB8};
     use std::io::Cursor;
 
     /// Some captures packets
@@ -673,11 +673,14 @@ mod tests {
     #[test]
     fn serialize_rgb8() {
         #[rustfmt::skip]
-        assert_eq!(RGB8 {r: 232,g: 211,b: 75}.as_slice(),&[232, 211, 75]);
+        let t1 = [RGB8 {r: 232,g: 211,b: 75}];
+        assert_eq!(cast_slice::<rgb::Rgb<u8>, u8>(&t1), &[232, 211, 75]);
         #[rustfmt::skip]
-        assert_eq!(RGB8 {r: 232, g: 0, b: 75}.as_slice(), &[232, 0, 75]);
+        let t2 = [RGB8 {r: 232,g: 0,b: 75}];
+        assert_eq!(cast_slice::<rgb::Rgb<u8>, u8>(&t2), &[232, 0, 75]);
         #[rustfmt::skip]
-        assert_eq!(RGB8 { r: 0, g: 0, b: 75 }.as_slice(), &[0, 0, 75]);
+        let t3 = [RGB8 {r: 0,g: 0,b: 75}];
+        assert_eq!(cast_slice::<rgb::Rgb<u8>, u8>(&t3), &[0, 0, 75]);
     }
 
     #[test]
