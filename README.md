@@ -207,6 +207,11 @@ This project is not affiliated or endorsed by Cherry GmbH.
 
 ## Changelog
 
+### v0.2.10 - 25/08/2026
+
+* Added cargo audit in github CI
+* Upgraded many dependencies, fixing [RUSTSEC-2024-0006](https://rustsec.org/advisories/RUSTSEC-2024-0006) and several minor warnings reported by cargo audit.
+
 ### v0.2.9 - 22/08/2026
 
 * deps: Upgraded binrw to 0.15.2 fixing warnings with current stable toolchain
