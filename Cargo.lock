@@ -180,7 +180,7 @@ checksum = "f079e83a288787bcd14a6aea84cee5c87a67c5a3e660c30f557a3d24761b3527"
 
 [[package]]
 name = "cherryrgb"
-version = "0.2.9"
+version = "0.2.10"
 dependencies = [
  "binrw",
  "clap",
@@ -198,7 +198,7 @@ dependencies = [
 
 [[package]]
 name = "cherryrgb_cli"
-version = "0.2.9"
+version = "0.2.10"
 dependencies = [
  "anyhow",
  "cherryrgb",
@@ -212,7 +212,7 @@ dependencies = [
 
 [[package]]
 name = "cherryrgb_ncli"
-version = "0.2.9"
+version = "0.2.10"
 dependencies = [
  "anyhow",
  "cherryrgb",
@@ -226,7 +226,7 @@ dependencies = [
 
 [[package]]
 name = "cherryrgb_service"
-version = "0.2.9"
+version = "0.2.10"
 dependencies = [
  "anyhow",
  "cherryrgb",
@@ -994,7 +994,7 @@ checksum = "23b97319f7b8343df12cc98938e5c3eb436064524c8d2b4e30a1d3a36eecdf81"
 
 [[package]]
 name = "xtask"
-version = "0.2.9"
+version = "0.2.10"
 dependencies = [
  "anstream",
  "cargo_toml",
