@@ -21,6 +21,8 @@
 //!   (~25 fps), otherwise the LEDs decay within a second
 //! - All lighting effects are rendered on the host
 
+use std::collections::VecDeque;
+use std::sync::Mutex;
 use std::thread;
 use std::time::Duration;
 
@@ -127,6 +129,8 @@ fn build_packet(seq: u8, keys: &[KeyColor], tail: bool) -> [u8; PACKET_LEN + 1] 
 /// Handle to a legacy protocol keyboard
 pub struct LegacyKeyboard {
     device: hidapi::HidDevice,
+    /// Non-ack packets (key events) collected while draining acks
+    pending: Mutex<VecDeque<[u8; PACKET_LEN]>>,
 }
 
 impl LegacyKeyboard {
@@ -148,35 +152,59 @@ impl LegacyKeyboard {
         let path = path.ok_or(CherryRgbError::DeviceNotFoundError)?;
         let device = api.open_path(&path).map_err(hid_err)?;
 
-        Ok(Self { device })
+        Ok(Self {
+            device,
+            pending: Mutex::new(VecDeque::new()),
+        })
     }
 
-    /// Send a single frame (all 9 packets), draining the acks in between.
+    /// Send a single frame (all 9 packets), then drain the input endpoint.
+    /// Acknowledgements are discarded, key events read while draining are
+    /// queued and can be collected via `read_packet`.
     /// Note: the keyboard forgets the frame within a second unless the
     /// frames keep coming - use one of the streaming methods instead.
     pub fn send_frame(&self, keys: &[KeyColor; TOTAL_KEYS]) -> Result<(), CherryRgbError> {
         for chunk in 0..(TOTAL_KEYS / CHUNK_KEYS) {
             self.send_chunk(chunk as u8 + 1, &keys[chunk * CHUNK_KEYS..(chunk + 1) * CHUNK_KEYS], false)?;
         }
-        self.send_chunk(9, &keys[TOTAL_KEYS - TAIL_KEYS..], true)
+        self.send_chunk(9, &keys[TOTAL_KEYS - TAIL_KEYS..], true)?;
+        self.drain_acks();
+        Ok(())
     }
 
     fn send_chunk(&self, seq: u8, keys: &[KeyColor], tail: bool) -> Result<(), CherryRgbError> {
         let packet = build_packet(seq, keys, tail);
 
         self.device.write(&packet).map_err(hid_err)?;
-        self.drain_acks();
 
         Ok(())
     }
 
-    fn drain_acks(&self) {
+    /// Read the next input packet (acknowledgement or key event) with
+    /// timeout. Returns None when no packet arrived within the timeout.
+    /// Key events read while draining acks are returned first.
+    pub fn read_packet(&self, timeout_ms: i32) -> Option<[u8; PACKET_LEN]> {
+        if let Some(pkt) = self.pending.lock().unwrap().pop_front() {
+            return Some(pkt);
+        }
+        self.read_raw(timeout_ms)
+    }
+
+    fn read_raw(&self, timeout_ms: i32) -> Option<[u8; PACKET_LEN]> {
         let mut buf = [0u8; PACKET_LEN];
-        loop {
-            match self.device.read_timeout(&mut buf, 10) {
-                Ok(len) if len > 0 => continue,
-                _ => break,
+        match self.device.read_timeout(&mut buf, timeout_ms) {
+            Ok(len) if len > 0 => Some(buf),
+            _ => None,
+        }
+    }
+
+    fn drain_acks(&self) {
+        while let Some(pkt) = self.read_raw(5) {
+            if pkt[0] == 0xc1 && pkt[1] == 0x01 {
+                continue; // acknowledgement
             }
+            // key event read while draining: queue it for the caller
+            self.pending.lock().unwrap().push_back(pkt);
         }
     }
 
