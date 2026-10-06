@@ -28,8 +28,6 @@ fn main() -> Result<()> {
     }
 
     let (vendor_id, product_id) = devices.first().unwrap().to_owned();
-    let keyboard =
-        CherryKeyboard::new(vendor_id, product_id).context("Failed to create keyboard")?;
 
     let loglevel = if opt.debug {
         log::Level::Debug
@@ -39,6 +37,89 @@ fn main() -> Result<()> {
     simple_logger::init_with_level(loglevel)?;
 
     /* Fun begins */
+
+    // Legacy protocol keyboards (e.g. MX BOARD 6.0 RGB, PID 0x00B8) speak a
+    // completely different framebuffer streaming protocol
+    if cherryrgb::legacy::is_legacy_product_id(product_id) {
+        let keyboard = cherryrgb::legacy::LegacyKeyboard::new(vendor_id, product_id)
+            .context("Failed to create legacy keyboard")?;
+
+        match opt.command {
+            CliCommand::Animation(args) => {
+                let color = args.color.unwrap_or(rgb::RGB8::new(255, 255, 255).into());
+
+                log::info!(
+                    "Setting: mode={:?} brightness={:?} speed={:?} color={:?}",
+                    args.mode,
+                    opt.brightness,
+                    args.speed,
+                    color
+                );
+
+                keyboard
+                    .stream_animation(args.mode, opt.brightness, args.speed, color, args.rainbow)
+                    .context("Failed to stream animation")?;
+            }
+            CliCommand::CustomColors(args) => {
+                let bright = cherryrgb::legacy::brightness_byte(opt.brightness);
+                let mut frame =
+                    [cherryrgb::legacy::KeyColor::default(); cherryrgb::legacy::TOTAL_KEYS];
+
+                for (index, color) in args.colors.into_iter().enumerate() {
+                    if index >= cherryrgb::legacy::TOTAL_KEYS {
+                        break;
+                    }
+                    frame[index] = cherryrgb::legacy::KeyColor::new(bright, color);
+                }
+
+                keyboard
+                    .stream_static(&frame)
+                    .context("Failed to stream colors")?;
+            }
+            CliCommand::ColorProfileFile(args) => {
+                let mut f = File::open(&args.file_path)
+                    .context(format!("color profile {:?}", args.file_path))?;
+                let mut json: String = String::new();
+
+                f.read_to_string(&mut json)?;
+                // Allow // comments
+                let re = regex::RegexBuilder::new(r"//.*?$")
+                    .multi_line(true)
+                    .build()
+                    .unwrap();
+                json = re.replace_all(&json, "").to_string();
+                // Allow trailing comma after last element
+                let re = regex::RegexBuilder::new(r",(\s*\})").build().unwrap();
+                json = re.replace_all(&json, "$1").to_string();
+
+                log::debug!("{json}");
+
+                let colors_from_file =
+                    read_color_profile(&json).context("reading colors from color file")?;
+
+                let bright = cherryrgb::legacy::brightness_byte(opt.brightness);
+                let mut frame =
+                    [cherryrgb::legacy::KeyColor::default(); cherryrgb::legacy::TOTAL_KEYS];
+
+                for key in colors_from_file {
+                    if key.key_index >= cherryrgb::legacy::TOTAL_KEYS {
+                        continue;
+                    }
+                    frame[key.key_index] = cherryrgb::legacy::KeyColor::new(bright, key.rgb_value);
+                }
+
+                keyboard
+                    .stream_static(&frame)
+                    .context("Failed to stream colors")?;
+            }
+        }
+
+        return Ok(());
+    }
+
+    let keyboard =
+        CherryKeyboard::new(vendor_id, product_id).context("Failed to create keyboard")?;
+
     keyboard
         .fetch_device_state()
         .context("Fetching device state failed")?;
