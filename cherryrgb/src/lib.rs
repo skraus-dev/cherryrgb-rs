@@ -54,6 +54,7 @@
 
 mod extensions;
 mod models;
+pub mod legacy;
 #[cfg(all(target_os = "linux", feature = "uhid"))]
 mod vkbd;
 
@@ -112,6 +113,8 @@ pub enum CherryRgbError {
     JsonParseError(#[from] serde_json::Error),
     #[error("Protocol error")]
     ProtocolError(String),
+    #[error("Legacy protocol error: {0}")]
+    LegacyError(String),
 }
 
 /// Calculate packet checksum (index 1 in payload)

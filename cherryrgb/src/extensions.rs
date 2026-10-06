@@ -33,6 +33,11 @@ impl OwnRGB8 {
     pub fn new(r: u8, g: u8, b: u8) -> Self {
         Self(RGB8 { r, g, b })
     }
+
+    /// Access the wrapped RGB8 value
+    pub fn rgb(&self) -> RGB8 {
+        self.0
+    }
 }
 
 impl From<RGB8> for OwnRGB8 {
