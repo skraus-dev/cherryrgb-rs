@@ -11,6 +11,7 @@ Please send a Pull Request with your keyboard model once you can report on suppo
 
 | Name                          | PID                  | Tested? | Features (Animation / Custom Colors / Key Remap) |
 | ----------------------------- | -------------------- | --------| ------------------------------------------------ |
+| MX BOARD 6.0 RGB (legacy)     | 0x00B8               | ✅      | ✅ host-rendered (Static/Spectrum/Wave/Breathing) / ✅ (slot-indexed) / ❌ |
 | MX BOARD 3.0S FL NBL          | 0x0077               | ❌      | ❌ / ❌ / ❌ |
 | MX BOARD 3.0S FL RGB          | 0x0079               | ✅      | ✅ / ✅ / ❌ |
 | MX BOARD 3.0S FL RGB KOREAN   | 0x0083               | ❌      | ❌ / ❌ / ❌ |
