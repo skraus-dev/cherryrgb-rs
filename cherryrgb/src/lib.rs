@@ -53,8 +53,8 @@
 //! ```
 
 mod extensions;
-mod models;
 pub mod legacy;
+mod models;
 #[cfg(all(target_os = "linux", feature = "uhid"))]
 mod vkbd;
 

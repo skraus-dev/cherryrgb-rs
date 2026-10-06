@@ -14,7 +14,6 @@ uhid = ["dep:uhid-virt"]
 thiserror = "2"
 binrw = "0.15.2"
 hex = "0.4"
-hidapi = "2.6"
 log = "0.4"
 rgb = { version = "0.8", features = ["serde"] }
 rusb = "0.9"
@@ -23,6 +22,16 @@ strum = "0.28.0"
 strum_macros = "0.28.0"
 clap = { version = "4.3.1", features = ["derive"] }
 serde_json = "1.0"
+
+# Linux uses the pure-Rust basic-udev backend: the default hidapi linux
+# backend requires libudev at build time, which breaks docs.rs/CI builds
+[target.'cfg(target_os = "linux")'.dependencies]
+hidapi = { version = "2.6", default-features = false, features = [
+    "linux-native-basic-udev",
+] }
+
+[target.'cfg(not(target_os = "linux"))'.dependencies]
+hidapi = "2.6"
 
 [target.'cfg(all(target_os = "linux"))'.dependencies]
 uhid-virt = { version = "0.0.8", optional = true }
