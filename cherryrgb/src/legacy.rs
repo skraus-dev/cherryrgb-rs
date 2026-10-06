@@ -165,7 +165,11 @@ impl LegacyKeyboard {
     /// frames keep coming - use one of the streaming methods instead.
     pub fn send_frame(&self, keys: &[KeyColor; TOTAL_KEYS]) -> Result<(), CherryRgbError> {
         for chunk in 0..(TOTAL_KEYS / CHUNK_KEYS) {
-            self.send_chunk(chunk as u8 + 1, &keys[chunk * CHUNK_KEYS..(chunk + 1) * CHUNK_KEYS], false)?;
+            self.send_chunk(
+                chunk as u8 + 1,
+                &keys[chunk * CHUNK_KEYS..(chunk + 1) * CHUNK_KEYS],
+                false,
+            )?;
         }
         self.send_chunk(9, &keys[TOTAL_KEYS - TAIL_KEYS..], true)?;
         self.drain_acks();
@@ -251,9 +255,7 @@ impl LegacyKeyboard {
             let frame = match mode {
                 LightingMode::Static => solid_frame(bright, rgb),
                 LightingMode::Spectrum => spectrum_frame(bright, tick, 2 * speed_step),
-                LightingMode::Wave => {
-                    wave_frame(bright, rgb, rainbow, tick, speed_step)
-                }
+                LightingMode::Wave => wave_frame(bright, rgb, rainbow, tick, speed_step),
                 LightingMode::Breathing => breathing_frame(bright, rgb, tick, breathing_period),
                 _ => {
                     return Err(CherryRgbError::LegacyError(format!(
@@ -348,7 +350,10 @@ mod tests {
 
         let pkt = build_packet(1, &keys[..CHUNK_KEYS], false);
         assert_eq!(pkt.len(), PACKET_LEN + 1);
-        assert_eq!(&pkt[..9], &[0, 0xc1, 0x3d, 0x01, 0x3f, 0x33, 0x22, 0x11, 0x3f]);
+        assert_eq!(
+            &pkt[..9],
+            &[0, 0xc1, 0x3d, 0x01, 0x3f, 0x33, 0x22, 0x11, 0x3f]
+        );
         // pad byte after 15 keys
         assert_eq!(pkt[4 + CHUNK_KEYS * 4], 0);
     }

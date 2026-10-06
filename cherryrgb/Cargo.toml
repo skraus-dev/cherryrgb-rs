@@ -14,7 +14,6 @@ uhid = ["dep:uhid-virt"]
 thiserror = "2"
 binrw = "0.15.2"
 hex = "0.4"
-hidapi = "2.6"
 log = "0.4"
 rgb = { version = "0.8", features = ["serde"] }
 serde = { version = "1.0.160", features = ["derive"] }
