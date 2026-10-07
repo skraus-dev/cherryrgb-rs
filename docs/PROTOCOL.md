@@ -62,12 +62,34 @@ Per key 4 bytes:
 Every output packet is answered by one input packet `c1 01 00 00 ...`.
 Read (and discard) it before sending the next packet.
 
+### Initialization handshake (required for key events)
+
+When the original utility starts, it sends five `e1 xx` command packets on
+the OUT endpoint **before** the first frame (each acknowledged with a
+similarly-shaped input packet):
+
+```
+e1 03 c7 01 01 00 00 ...
+e1 04 c8 02 00 fa 00 00 ...
+e1 05 c9 03 c0 00 00 00 ...
+e1 05 e2 03 c1 01 01 00 00 ...   (right before the stream starts)
+e1 05 e2 03 c1 01 00 00 00 ...   (immediately after)
+```
+
+The exact semantics of these packets are unknown. What is known: the
+key-state reporting described below is **disabled after keyboard power-up**
+and gets enabled by this sequence - without replaying it after a replug or
+reboot, no `e0 23` packets are emitted at all. Lighting frames work
+regardless.
+
 ### Key events
 
 Independent of the frame stream the keyboard emits input packets
-`e0 23 c2 21 01 <state> 00 <HID keycodes ...>` when keys are pressed or
-released. The original utility uses these to highlight physical keys in its
-remapping editor. They are not required for lighting control.
+`e0 23 c2 21 01 <state> 00 <HID keycodes ...>` carrying the **full list of
+currently held keys** (an empty list means everything was released). The
+original utility diffs consecutive packets to derive press/release events
+and uses them to highlight physical keys in its remapping editor. They are
+not required for lighting control.
 
 ### Physical key mapping
 
