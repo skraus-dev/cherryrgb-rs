@@ -212,6 +212,15 @@ impl LegacyKeyboard {
         }
     }
 
+    /// Write a raw 64-byte output report without any ack handling.
+    /// Used for protocol-level commands outside the frame format.
+    pub fn write_raw_packet(&self, packet: &[u8; PACKET_LEN]) -> Result<(), CherryRgbError> {
+        let mut buf = [0u8; PACKET_LEN + 1];
+        buf[1..].copy_from_slice(packet);
+        self.device.write(&buf).map_err(hid_err)?;
+        Ok(())
+    }
+
     /// Stream a static frame until the process is interrupted (Ctrl+C)
     pub fn stream_static(&self, keys: &[KeyColor; TOTAL_KEYS]) -> Result<(), CherryRgbError> {
         log::info!("Streaming static frame, press Ctrl+C to stop");
